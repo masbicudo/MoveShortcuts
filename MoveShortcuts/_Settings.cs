@@ -238,6 +238,7 @@ namespace MoveShortcuts
             } },
             { @"BleachBit", new() {
                 AltNames = { "bleach", "clean" },
+                ElevNames = { "bleacha", "cleana", "ableach", "aclean" },
             } },
             { @"balenaEtcher", new() {
                 AltNames = { "be", "etcher", "betcher", "etch", "balena", "balena-etcher" },
@@ -256,6 +257,9 @@ namespace MoveShortcuts
             } },
             { @"CrystalDiskMark 8 Shizuku Edition (64bit)", new() {
                 AltNames = { "cdm-se", "cdm8-se", "cdiskmark-se", "cdisk-se", "cdm", "cdm8", "cdiskmark", "cdisk" },
+            } },
+            { @"CrystalDiskInfo Shizuku Edition", new() {
+                AltNames = { "cdm-se", "cdiskmark-se", "cdisk-se", "cdm", "cdiskmark", "cdisk" },
             } },
             { @"CrystalDiskMark 8", new() {
                 AltNames = { "cdm", "cdm8", "cdiskmark", "cdisk" },
@@ -382,7 +386,7 @@ namespace MoveShortcuts
                 AltNames = { "pdn", "pnet", "p-net", "pdnet", "pd-net", "paintnet", "paint-net", "paintdotnet", "paint-dot-net" },
             } },
             { @"pgAdmin 4", new() {
-                AltNames = { "pgadm", "pga", "pa" },
+                AltNames = { "pgadmin", "pgadm", "pga", "pa", "pgadmin4", "pgadm4", "pga4", "pa4" },
             } },
             { @"Photoshop", new() {
                 AltNames = { "ps" },

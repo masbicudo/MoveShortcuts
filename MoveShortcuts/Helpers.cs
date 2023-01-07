@@ -6,6 +6,10 @@ using System.Threading.Tasks;
 
 namespace MoveShortcuts
 {
+}
+
+namespace MoveShortcuts
+{
     public static class Helpers
     {
         public static string ToString<T>(T o) => $"{o}";
@@ -60,6 +64,10 @@ namespace MoveShortcuts
                 counter++;
             }
             Console.WriteLine();
+        }
+        public static Comparison<T> ReverseComparer<T>(Comparison<T> comparer)
+        {
+            return (x, y) => -comparer(x, y);
         }
     }
 }

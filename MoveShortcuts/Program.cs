@@ -31,9 +31,33 @@ var dirEnumOpts = new EnumerationOptions
 };
 List<string> allSourceFiles = new();
 {
-    allSourceFiles.AddRange(Directory.GetFiles(desktopPath, "*.*", dirEnumOpts));
-    allSourceFiles.AddRange(Directory.GetFiles(startMenuPath, "*.*", dirEnumOptsRecursive));
-    allSourceFiles.AddRange(Directory.GetFiles(startMenuPath2, "*.*", dirEnumOptsRecursive));
+    //      We use a reverse filename comparer so that the
+    // files with greatest versions comes first and we end up
+    // using these to create shortcuts.
+    //      This only happens if the files have the same name
+    // but are contained in folders that carry version numbers.
+    // When the version number is directly on the final file,
+    // then both will get to the next stage, where the sorting
+    // is in ascending order. This is made because every file
+    // will be processed, and we want larger versions to overwrite
+    // lesser versions associated commands.
+    var revFileNameComparer = Helpers.ReverseComparer<string>(FileNameComparer.Default.Compare);
+
+    var allDesktopFiles = Directory.GetFiles(desktopPath, "*.*", dirEnumOpts).ToList();
+    allDesktopFiles.Sort(revFileNameComparer);
+    allSourceFiles.AddRange(allDesktopFiles);
+
+    var allDesktopFiles2 = Directory.GetFiles(desktopPath2, "*.*", dirEnumOpts).ToList();
+    allDesktopFiles2.Sort(revFileNameComparer);
+    allSourceFiles.AddRange(allDesktopFiles2);
+
+    var allStartMenuFiles = Directory.GetFiles(startMenuPath, "*.*", dirEnumOptsRecursive).ToList();
+    allStartMenuFiles.Sort(revFileNameComparer);
+    allSourceFiles.AddRange(allStartMenuFiles);
+
+    var allStartMenuFiles2 = Directory.GetFiles(startMenuPath2, "*.*", dirEnumOptsRecursive).ToList();
+    allStartMenuFiles2.Sort(revFileNameComparer);
+    allSourceFiles.AddRange(allStartMenuFiles2);
 }
 
 Console.WriteLine("Collecting files to process:");
