@@ -76,9 +76,10 @@ foreach (var file in Helpers.LogProgress(allSourceFiles, Path.GetFileName))
         if (keyMatch != null)
             opts = fileOptions[keyMatch];
     }
+    var isOffline = (File.GetAttributes(file) & FileAttributes.Offline) != 0;
     if (opts != null)
     {
-        actionsList.Add(new(file, fileName, opts));
+        actionsList.Add(new(file, fileName, opts, isOffline));
     }
 }
 actionsList.Sort(
@@ -90,6 +91,9 @@ actionsList.Sort(
 Console.WriteLine("Processing files:");
 foreach (var action in Helpers.LogProgress(actionsList, a => a.FileName))
 {
+    if (action.IsOffline)
+        continue;
+
     var currentPath = action.FullPath;
     if ((action.Options.Action & FileAction.MakeShortcut) != 0)
     {

@@ -332,13 +332,7 @@ namespace MoveShortcuts
             { @"Inkscape", new() {
                 AltNames = { "is", "iscape", "ink", "inks" },
             } },
-            { @"Julia 1.7.2", new() {
-                AltNames = { "jul", "jl" },
-            } },
-            { @"Julia 1.8.0", new() {
-                AltNames = { "jul", "jl" },
-            } },
-            { @"Julia 1.8.3", new() {
+            { @"Julia \d\.\d\.\d", new() {
                 AltNames = { "jul", "jl" },
             } },
             { @"KDiff3", new() {
