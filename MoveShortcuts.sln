@@ -3,9 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.5.33103.201
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MoveShortcuts", "MoveShortcuts\MoveShortcuts.csproj", "{FD5186AD-EC70-4062-9996-67C2C69A9684}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MoveShortcuts", "MoveShortcuts\MoveShortcuts.csproj", "{FD5186AD-EC70-4062-9996-67C2C69A9684}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MoveShortcutTests", "MoveShortcutTests\MoveShortcutTests.csproj", "{75319DAE-B827-4E44-B78F-6078298CE611}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MoveShortcutTests", "MoveShortcutTests\MoveShortcutTests.csproj", "{75319DAE-B827-4E44-B78F-6078298CE611}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

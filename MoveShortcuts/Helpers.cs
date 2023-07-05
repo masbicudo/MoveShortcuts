@@ -6,10 +6,6 @@ using System.Threading.Tasks;
 
 namespace MoveShortcuts
 {
-}
-
-namespace MoveShortcuts
-{
     public static class Helpers
     {
         public static string ToString<T>(T o) => $"{o}";

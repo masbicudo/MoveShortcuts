@@ -1,13 +1,24 @@
 ﻿// See https://aka.ms/new-console-template for more information
 using MoveShortcuts;
+using Newtonsoft.Json;
 using System.Text.RegularExpressions;
 
-var fileOptions = _Settings.fileOptions;
-var shortcuts = _Settings.shortcuts;
+var options = new Settings();
 
-//foreach (var key in fileOptions.Keys.ToArray())
-//    if (!key.Contains("Visual Studio Code"))
-//        fileOptions.Remove(key);
+var optsFileName = "move-shortcuts-options.json";
+if (File.Exists(optsFileName))
+{
+    var json = File.ReadAllText(optsFileName);
+    options = JsonConvert.DeserializeObject<Settings>(json);
+}
+else
+{
+    var json = JsonConvert.SerializeObject(options, Formatting.Indented);
+    File.WriteAllText(optsFileName, json);
+}
+
+var fileOptions = options.fileOptions;
+var shortcuts = options.shortcuts;
 
 // ensuring shortcuts directory is there
 Directory.CreateDirectory(shortcuts);
@@ -20,6 +31,9 @@ var desktopPath2 = Environment.GetFolderPath(Environment.SpecialFolder.CommonDes
 var startMenuPath = Environment.GetFolderPath(Environment.SpecialFolder.StartMenu);
 var startMenuPath2 = Environment.GetFolderPath(Environment.SpecialFolder.CommonStartMenu);
 
+//
+// First step: listing files from special locations
+//
 var dirEnumOptsRecursive = new EnumerationOptions
 {
     IgnoreInaccessible = true,
@@ -30,6 +44,7 @@ var dirEnumOpts = new EnumerationOptions
     IgnoreInaccessible = true,
 };
 List<string> allSourceFiles = new();
+
 {
     //      We use a reverse filename comparer so that the
     // files with greatest versions comes first and we end up
@@ -60,9 +75,13 @@ List<string> allSourceFiles = new();
     allSourceFiles.AddRange(allStartMenuFiles2);
 }
 
+//
+// Second step: matching collected files with items from the settings
+//
 Console.WriteLine("Collecting files to process:");
 HashSet<string> usedFilesNames = new();
 List<MyFileAction> actionsList = new();
+
 foreach (var file in Helpers.LogProgress(allSourceFiles, Path.GetFileName))
 {
     var fileName = Path.GetFileNameWithoutExtension(file);
@@ -76,10 +95,12 @@ foreach (var file in Helpers.LogProgress(allSourceFiles, Path.GetFileName))
         if (keyMatch != null)
             opts = fileOptions[keyMatch];
     }
-    var isOffline = (File.GetAttributes(file) & FileAttributes.Offline) != 0;
+    var fileAttr = (FILE_ATTRIBUTES)File.GetAttributes(file);
+    var isOffline = (fileAttr & FILE_ATTRIBUTES.OFFLINE) != 0;
+    var isRecallOnAccess = (fileAttr & FILE_ATTRIBUTES.RECALL_ON_DATA_ACCESS) != 0;
     if (opts != null)
     {
-        actionsList.Add(new(file, fileName, opts, isOffline));
+        actionsList.Add(new(file, fileName, opts, isOffline || isRecallOnAccess));
     }
 }
 actionsList.Sort(
@@ -88,10 +109,13 @@ actionsList.Sort(
             a2.FileName)
     );
 
+//
+// Third step: 
+//
 Console.WriteLine("Processing files:");
 foreach (var action in Helpers.LogProgress(actionsList, a => a.FileName))
 {
-    if (action.IsOffline)
+    if (action.IsNotReady)
         continue;
 
     var currentPath = action.FullPath;
