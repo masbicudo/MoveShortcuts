@@ -1,7 +1,14 @@
 ﻿// See https://aka.ms/new-console-template for more information
+using HtmlAgilityPack;
 using MoveShortcuts;
 using Newtonsoft.Json;
+using System.Diagnostics;
+using System.Drawing;
+using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
+using static System.Net.Mime.MediaTypeNames;
+
+var log = new StreamWriter(File.Open("move-shortcuts.log", FileMode.Append));
 
 var options = new Settings();
 
@@ -45,6 +52,15 @@ var dirEnumOpts = new EnumerationOptions
 };
 List<string> allSourceFiles = new();
 
+// Creating shortcuts for all UWP programs that appear in the
+// listing inside the configurations file. These will be created
+// in a subfolder of the shortcuts folder
+Console.WriteLine("Creating shortcuts for UWP programs:");
+var uwpApps = Helpers.GetUwpApps();
+var uwpShortcutsFolder = Path.Combine(shortcuts, "UWP Apps");
+Helpers.CreateUWPShortcuts(uwpShortcutsFolder, fileOptions, uwpApps);
+
+Console.WriteLine("Collecting items locations");
 {
     //      We use a reverse filename comparer so that the
     // files with greatest versions comes first and we end up
@@ -73,7 +89,13 @@ List<string> allSourceFiles = new();
     var allStartMenuFiles2 = Directory.GetFiles(startMenuPath2, "*.*", dirEnumOptsRecursive).ToList();
     allStartMenuFiles2.Sort(revFileNameComparer);
     allSourceFiles.AddRange(allStartMenuFiles2);
+
+    var allUwpApps = Directory.GetFiles(uwpShortcutsFolder, "*.*", dirEnumOptsRecursive).ToList();
+    allUwpApps.Sort(revFileNameComparer);
+    allSourceFiles.AddRange(allUwpApps);
+
 }
+Console.WriteLine($"  Found {allSourceFiles.Count} items");
 
 //
 // Second step: matching collected files with items from the settings
@@ -90,8 +112,10 @@ foreach (var file in Helpers.LogProgress(allSourceFiles, Path.GetFileName))
     usedFilesNames.Add(fileName);
     if (!fileOptions.TryGetValue(fileName, out MyFileOptions? opts))
     {
-        var keyMatch = fileOptions.Keys.FirstOrDefault(
-            k => Regex.IsMatch(fileName, "^" + k + "$", RegexOptions.IgnoreCase));
+        var keyMatch = fileOptions.Keys
+            .Where(x => !Path.IsPathFullyQualified(x))
+            .FirstOrDefault(
+                k => Regex.IsMatch(fileName, "^" + k + "$", RegexOptions.IgnoreCase));
         if (keyMatch != null)
             opts = fileOptions[keyMatch];
     }
@@ -103,6 +127,25 @@ foreach (var file in Helpers.LogProgress(allSourceFiles, Path.GetFileName))
         actionsList.Add(new(file, fileName, opts, isOffline || isRecallOnAccess));
     }
 }
+
+foreach (var file in fileOptions.Keys.Where(Path.IsPathFullyQualified))
+{
+    var fileName = Path.GetFileNameWithoutExtension(file);
+    var opts = fileOptions[file];
+    var fileAttr = (FILE_ATTRIBUTES)File.GetAttributes(file);
+    var isOffline = (fileAttr & FILE_ATTRIBUTES.OFFLINE) != 0;
+    var isRecallOnAccess = (fileAttr & FILE_ATTRIBUTES.RECALL_ON_DATA_ACCESS) != 0;
+    actionsList.Add(new(file, fileName, opts, isOffline || isRecallOnAccess));
+}
+
+foreach (var key in fileOptions.Keys)
+{
+    var opts = fileOptions[key];
+    if (opts.Target == null)
+        continue;
+    actionsList.Add(new(opts.Target, key, opts, false));
+}
+
 actionsList.Sort(
         (a1, a2) => FileNameComparer.Default.Compare(
             a1.FileName,
@@ -119,9 +162,120 @@ foreach (var action in Helpers.LogProgress(actionsList, a => a.FileName))
         continue;
 
     var currentPath = action.FullPath;
+    if ((action.Options.Action & FileAction.InternetLink) != 0)
+    {
+        if (Regex.IsMatch(currentPath, @"^https?:"))
+        {
+            Bitmap bm = null;
+            var favicon = Helpers.GetFavIconName(currentPath);
+            var url = currentPath;
+            var web = new HtmlWeb();
+            var doc = web.Load(url);
+            //doc.Save("xpto.html");
+            foreach (var el in doc.DocumentNode.SelectNodes("//head/link[@rel='icon']"))
+                favicon = Helpers.GetFavIconName(currentPath, el.GetAttributeValue("href", "/favicon.ico"));
+
+            Directory.CreateDirectory(Path.Combine(shortcuts, "ShctIcons"));
+            var iconFullPath = Path.Combine(shortcuts, "ShctIcons", action.FileName) + ".ico";
+            var faviconBuffer = Helpers.Download(favicon);
+            try
+            {
+                bm = new Bitmap(System.Drawing.Image.FromStream(new MemoryStream(faviconBuffer)));
+            }
+            catch { }
+            if (bm != null)
+            {
+                Icon ic = Icon.FromHandle(bm.GetHicon());
+                using (var icStream = File.Create(iconFullPath))
+                    ic.Save(icStream);
+            }
+
+            void CreateInternetLink(string name)
+            {
+                var altFullPathLnk = Path.Combine(shortcuts, name) + ".lnk";
+                if (File.Exists(iconFullPath))
+                {
+                    Helpers.CreateShortcut(altFullPathLnk, currentPath, iconFullPath);
+                    //using (var urlStream = File.Open(altFullPathLnk, FileMode.Append))
+                    //using (var urlWriter = new StreamWriter(urlStream))
+                    //    urlWriter.WriteLine($"IconFile={iconFullPath}");
+                }
+                else
+                {
+                    log.WriteLine($"Missing icon: {iconFullPath}");
+                    Helpers.CreateShortcut(altFullPathLnk, currentPath);
+                }
+            }
+            CreateInternetLink(action.FileName);
+            foreach (var altname in action.Options.AltNames)
+            {
+                CreateInternetLink(altname);
+            }
+        }
+    }
+
+    if ((action.Options.Action & FileAction.FolderLink) != 0)
+        {
+        if (Directory.Exists(currentPath))
+        {
+            void CreateDirLinks(string name)
+            {
+                var altFullPathLnk = Path.Combine(shortcuts, name) + ".lnk";
+                Helpers.CreateShortcut(altFullPathLnk, currentPath);
+                var driveLetter = Path.GetPathRoot(currentPath).Split(":")[0];
+
+                var altFullPathCmd = Path.Combine(shortcuts, name) + ".cmd";
+                File.WriteAllText(altFullPathCmd, $"""
+                    @echo off
+                    cd "{currentPath}"
+                    {driveLetter}:
+                    """);
+
+                var altFullPathPs1 = Path.Combine(shortcuts, name) + ".ps1";
+                File.WriteAllText(altFullPathPs1, $"""
+                    set-location "{currentPath}"
+                    """);
+
+                var altFullPathSh = Path.Combine(shortcuts, name) + ".sh";
+                var unixPath = "/" + string.Join("/", currentPath.Split("\\").Skip(1));
+                File.WriteAllText(altFullPathSh, $$"""
+                    #!/usr/bin/env bash
+                    function add_alias {
+                        echo "Adding alias for $1 $2$3"
+                        [ -d "/mnt/$2" ] && base="/mnt/$2" || base="/$2"
+                        line="alias $1='cd $base$3'"
+                        echo "    $line"
+                        touch ~/.bashrc
+                        if grep "$line" ~/.bashrc > /dev/null 2>&1
+                        then
+                            echo "Alias already present"
+                        else
+                            echo "$line" >> ~/.bashrc
+                            echo "Alias added, entering subshell"
+                            $SHELL
+                        fi
+                    }
+
+                    add_alias "{{name}}" "{{driveLetter.ToLower()}}" "{{unixPath}}"
+
+                    """.Replace("\r\n", "\n"));
+            }
+            var dirName = Path.GetFileName(currentPath);
+            if (!action.Options.AltNames.Contains(dirName, StringComparer.InvariantCultureIgnoreCase)
+                && !action.Options.ElevNames.Contains(dirName, StringComparer.InvariantCultureIgnoreCase))
+            {
+                CreateDirLinks(dirName);
+            }
+            foreach (var altname in action.Options.AltNames)
+            {
+                CreateDirLinks(altname);
+            }
+        }
+    }
+
     if ((action.Options.Action & FileAction.MakeShortcut) != 0)
     {
-        if (Helpers.HasExt(currentPath, ".lnk", ".url"))
+        if (File.Exists(currentPath) && Helpers.HasExt(currentPath, ".lnk", ".url"))
         {
             var fileNameExt = Path.GetFileName(currentPath);
             var targetFullPath = Path.Combine(shortcuts, fileNameExt);
@@ -152,22 +306,25 @@ foreach (var action in Helpers.LogProgress(actionsList, a => a.FileName))
         var pathAtDesktop = Path.Combine(desktopPath, fileNameExt);
         try
         {
-            if (File.Exists(pathAtDesktop))
-                File.Delete(pathAtDesktop);
+            if (Helpers.HasExt(currentPath, ".lnk", ".url"))
+                if (File.Exists(pathAtDesktop))
+                        File.Delete(pathAtDesktop);
         }
         catch (FileNotFoundException)
         {
         }
 
-        var fileNameExt2 = Path.GetFileName(action.FullPath);
         var pathAtDesktop2 = Path.Combine(desktopPath2, fileNameExt);
         try
         {
-            if (File.Exists(pathAtDesktop2))
-                File.Delete(pathAtDesktop2);
+            if (Helpers.HasExt(currentPath, ".lnk", ".url"))
+                if (File.Exists(pathAtDesktop2))
+                        File.Delete(pathAtDesktop2);
         }
         catch (FileNotFoundException)
         {
         }
     }
 }
+
+log.Close();

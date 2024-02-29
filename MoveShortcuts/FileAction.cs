@@ -21,5 +21,10 @@
         /// for PowerShell, Cmd, Bash and others that are available
         /// </summary>
         FolderLink = 4,
+
+        /// <summary>
+        /// Creates an internet link if it's an URL
+        /// </summary>
+        InternetLink = 8,
     }
 }

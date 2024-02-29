@@ -70,6 +70,5 @@
                 AltNames = { "whats", "whaz", "whazap", "whapp", "wzap", "zap", "zapzap", "zz", "wa" },
             } },
         };
-
     }
 }
