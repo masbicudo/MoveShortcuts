@@ -4,6 +4,8 @@
     {
         public string shortcuts = @"C:\Shortcuts";
 
+        public bool? getFavIcon = false;
+
         public Dictionary<string, MyFileOptions> fileOptions = new()
         {
             // Default examples on how to use the settings file.

@@ -174,17 +174,24 @@ namespace MoveShortcuts
             string schema_host = myUri.GetComponents(UriComponents.SchemeAndServer, UriFormat.Unescaped);  // host is "www.contoso.com"
             return schema_host + name;
         }
-        public static byte[] Download(string url)
+        public static byte[]? Download(string url)
         {
             Uri myUri = new Uri(url);
             string host = myUri.GetComponents(UriComponents.SchemeAndServer, UriFormat.Unescaped);  // host is "www.contoso.com"
             WebRequest request = (HttpWebRequest)WebRequest.Create(host + "/favicon.ico");
-            using (WebResponse response = request.GetResponse())
-            using (Stream responseStream = response.GetResponseStream())
-            using (MemoryStream ms = new MemoryStream())
+            try
             {
-                responseStream.CopyTo(ms);
-                return ms.ToArray();
+                using (WebResponse response = request.GetResponse())
+                using (Stream responseStream = response.GetResponseStream())
+                using (MemoryStream ms = new MemoryStream())
+                {
+                    responseStream.CopyTo(ms);
+                    return ms.ToArray();
+                }
+            }
+            catch (Exception ex)
+            {
+                return null;
             }
         }
     }

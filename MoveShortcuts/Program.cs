@@ -130,6 +130,8 @@ foreach (var file in Helpers.LogProgress(allSourceFiles, Path.GetFileName))
 
 foreach (var file in fileOptions.Keys.Where(Path.IsPathFullyQualified))
 {
+    if (!File.Exists(file) && !Directory.Exists(file))
+        continue;
     var fileName = Path.GetFileNameWithoutExtension(file);
     var opts = fileOptions[file];
     var fileAttr = (FILE_ATTRIBUTES)File.GetAttributes(file);
@@ -161,49 +163,61 @@ foreach (var action in Helpers.LogProgress(actionsList, a => a.FileName))
     if (action.IsNotReady)
         continue;
 
-    var currentPath = action.FullPath;
+    var targetObjectToOpen = action.FullPath;
     if ((action.Options.Action & FileAction.InternetLink) != 0)
     {
-        if (Regex.IsMatch(currentPath, @"^https?:"))
+        if (Regex.IsMatch(targetObjectToOpen, @"^https?:"))
         {
-            Bitmap bm = null;
-            var favicon = Helpers.GetFavIconName(currentPath);
-            var url = currentPath;
-            var web = new HtmlWeb();
-            var doc = web.Load(url);
-            //doc.Save("xpto.html");
-            foreach (var el in doc.DocumentNode.SelectNodes("//head/link[@rel='icon']"))
-                favicon = Helpers.GetFavIconName(currentPath, el.GetAttributeValue("href", "/favicon.ico"));
+            string iconFullPath = null;
+            if (options.getFavIcon == true)
+            {
+                Bitmap? bm = null;
+                var favicon = Helpers.GetFavIconName(targetObjectToOpen);
+                var url = targetObjectToOpen;
+                var web = new HtmlWeb();
+                var doc = web.Load(url);
+                //doc.Save("xpto.html");
+                var head_link_icon = doc.DocumentNode.SelectNodes("//head/link[@rel='icon']");
+                if (head_link_icon != null)
+                    foreach (var el in head_link_icon)
+                        favicon = Helpers.GetFavIconName(targetObjectToOpen, el.GetAttributeValue("href", "/favicon.ico"));
+                else
+                    favicon = Helpers.GetFavIconName(targetObjectToOpen, "/favicon.ico");
 
-            Directory.CreateDirectory(Path.Combine(shortcuts, "ShctIcons"));
-            var iconFullPath = Path.Combine(shortcuts, "ShctIcons", action.FileName) + ".ico";
-            var faviconBuffer = Helpers.Download(favicon);
-            try
-            {
-                bm = new Bitmap(System.Drawing.Image.FromStream(new MemoryStream(faviconBuffer)));
-            }
-            catch { }
-            if (bm != null)
-            {
-                Icon ic = Icon.FromHandle(bm.GetHicon());
-                using (var icStream = File.Create(iconFullPath))
-                    ic.Save(icStream);
+                Directory.CreateDirectory(Path.Combine(shortcuts, "ShctIcons"));
+                iconFullPath = Path.Combine(shortcuts, "ShctIcons", action.FileName) + ".ico";
+                var faviconBuffer = Helpers.Download(favicon);
+                if (faviconBuffer != null)
+                    try
+                    {
+                        bm = new Bitmap(System.Drawing.Image.FromStream(new MemoryStream(faviconBuffer)));
+                    }
+                    catch { }
+                if (bm != null)
+                {
+                    Icon ic = Icon.FromHandle(bm.GetHicon());
+                    using (var icStream = File.Create(iconFullPath))
+                        ic.Save(icStream);
+                }
             }
 
             void CreateInternetLink(string name)
             {
                 var altFullPathLnk = Path.Combine(shortcuts, name) + ".lnk";
-                if (File.Exists(iconFullPath))
+                if (iconFullPath != null && File.Exists(iconFullPath))
                 {
-                    Helpers.CreateShortcut(altFullPathLnk, currentPath, iconFullPath);
+                    Helpers.CreateShortcut(altFullPathLnk, targetObjectToOpen, iconFullPath);
+                    MakeGroups(shortcuts, action, altFullPathLnk);
                     //using (var urlStream = File.Open(altFullPathLnk, FileMode.Append))
                     //using (var urlWriter = new StreamWriter(urlStream))
                     //    urlWriter.WriteLine($"IconFile={iconFullPath}");
                 }
                 else
                 {
-                    log.WriteLine($"Missing icon: {iconFullPath}");
-                    Helpers.CreateShortcut(altFullPathLnk, currentPath);
+                    if (options.getFavIcon == true)
+                        log.WriteLine($"Missing icon: {iconFullPath}");
+                    Helpers.CreateShortcut(altFullPathLnk, targetObjectToOpen);
+                    MakeGroups(shortcuts, action, altFullPathLnk);
                 }
             }
             CreateInternetLink(action.FileName);
@@ -216,28 +230,30 @@ foreach (var action in Helpers.LogProgress(actionsList, a => a.FileName))
 
     if ((action.Options.Action & FileAction.FolderLink) != 0)
         {
-        if (Directory.Exists(currentPath))
+        if (Directory.Exists(targetObjectToOpen))
         {
             void CreateDirLinks(string name)
             {
                 var altFullPathLnk = Path.Combine(shortcuts, name) + ".lnk";
-                Helpers.CreateShortcut(altFullPathLnk, currentPath);
-                var driveLetter = Path.GetPathRoot(currentPath).Split(":")[0];
+                Helpers.CreateShortcut(altFullPathLnk, targetObjectToOpen);
+                MakeGroups(shortcuts, action, altFullPathLnk);
+
+                var driveLetter = Path.GetPathRoot(targetObjectToOpen).Split(":")[0];
 
                 var altFullPathCmd = Path.Combine(shortcuts, name) + ".cmd";
                 File.WriteAllText(altFullPathCmd, $"""
                     @echo off
-                    cd "{currentPath}"
+                    cd "{targetObjectToOpen}"
                     {driveLetter}:
                     """);
 
                 var altFullPathPs1 = Path.Combine(shortcuts, name) + ".ps1";
                 File.WriteAllText(altFullPathPs1, $"""
-                    set-location "{currentPath}"
+                    set-location "{targetObjectToOpen}"
                     """);
 
                 var altFullPathSh = Path.Combine(shortcuts, name) + ".sh";
-                var unixPath = "/" + string.Join("/", currentPath.Split("\\").Skip(1));
+                var unixPath = "/" + string.Join("/", targetObjectToOpen.Split("\\").Skip(1));
                 File.WriteAllText(altFullPathSh, $$"""
                     #!/usr/bin/env bash
                     function add_alias {
@@ -260,7 +276,7 @@ foreach (var action in Helpers.LogProgress(actionsList, a => a.FileName))
 
                     """.Replace("\r\n", "\n"));
             }
-            var dirName = Path.GetFileName(currentPath);
+            var dirName = Path.GetFileName(targetObjectToOpen);
             if (!action.Options.AltNames.Contains(dirName, StringComparer.InvariantCultureIgnoreCase)
                 && !action.Options.ElevNames.Contains(dirName, StringComparer.InvariantCultureIgnoreCase))
             {
@@ -275,26 +291,35 @@ foreach (var action in Helpers.LogProgress(actionsList, a => a.FileName))
 
     if ((action.Options.Action & FileAction.MakeShortcut) != 0)
     {
-        if (File.Exists(currentPath) && Helpers.HasExt(currentPath, ".lnk", ".url"))
+        if (File.Exists(targetObjectToOpen) && Helpers.HasExt(targetObjectToOpen, ".lnk", ".url"))
         {
-            var fileNameExt = Path.GetFileName(currentPath);
+            var fileNameExt = Path.GetFileName(targetObjectToOpen);
             var targetFullPath = Path.Combine(shortcuts, fileNameExt);
-            Helpers.Copy(currentPath, targetFullPath);
+            Helpers.Copy(targetObjectToOpen, targetFullPath);
+            MakeGroups(shortcuts, action, targetFullPath);
             action.FullPath = targetFullPath;
 
-            var ext = Path.GetExtension(currentPath);
+            var ext = Path.GetExtension(targetObjectToOpen);
             foreach (var altname in action.Options.AltNames)
             {
                 var altFullPath = Path.Combine(shortcuts, altname + ext);
-                Helpers.Copy(currentPath, altFullPath);
+                Helpers.Copy(targetObjectToOpen, altFullPath);
+                //MakeGroups(shortcuts, action, altFullPath);
             }
-            if (Helpers.HasExt(currentPath, ".lnk"))
+            if (Helpers.HasExt(targetObjectToOpen, ".lnk"))
             {
                 foreach (var altname in action.Options.ElevNames)
                 {
                     var altFullPath = Path.Combine(shortcuts, altname + ext);
-                    Helpers.Copy(currentPath, altFullPath);
+                    Helpers.Copy(targetObjectToOpen, altFullPath);
                     Helpers.MakeElevatedLink(altFullPath);
+                }
+                if (action.Options.ElevNames.Count > 0)
+                {
+                    var toCreateElev = Path.Combine(shortcuts, action.FileName + " Elevated" + ext);
+                    Helpers.Copy(targetObjectToOpen, toCreateElev);
+                    Helpers.MakeElevatedLink(toCreateElev);
+                    MakeGroups(shortcuts, action, toCreateElev);
                 }
             }
         }
@@ -306,7 +331,7 @@ foreach (var action in Helpers.LogProgress(actionsList, a => a.FileName))
         var pathAtDesktop = Path.Combine(desktopPath, fileNameExt);
         try
         {
-            if (Helpers.HasExt(currentPath, ".lnk", ".url"))
+            if (Helpers.HasExt(targetObjectToOpen, ".lnk", ".url"))
                 if (File.Exists(pathAtDesktop))
                         File.Delete(pathAtDesktop);
         }
@@ -317,7 +342,7 @@ foreach (var action in Helpers.LogProgress(actionsList, a => a.FileName))
         var pathAtDesktop2 = Path.Combine(desktopPath2, fileNameExt);
         try
         {
-            if (Helpers.HasExt(currentPath, ".lnk", ".url"))
+            if (Helpers.HasExt(targetObjectToOpen, ".lnk", ".url"))
                 if (File.Exists(pathAtDesktop2))
                         File.Delete(pathAtDesktop2);
         }
@@ -328,3 +353,13 @@ foreach (var action in Helpers.LogProgress(actionsList, a => a.FileName))
 }
 
 log.Close();
+
+static void MakeGroups(string shortcuts, MyFileAction action, string altFullPathLnk)
+{
+    foreach (var grp in action.Options.Groups)
+    {
+        var copyTo = Path.Combine(shortcuts, grp, Path.GetFileName(altFullPathLnk));
+        Directory.CreateDirectory(Path.Combine(shortcuts, grp));
+        Helpers.Copy(altFullPathLnk, copyTo);
+    }
+}

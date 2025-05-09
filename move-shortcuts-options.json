@@ -10,6 +10,9 @@
     "Microsoft Edge Dev": {
       "AltNames": [ "edge-dev", "edgedev", "edev", "e-dev", "edged", "edge-d" ]
     },
+    "Dashboard — CartPanda": {
+      "AltNames": ["cartpanda", "cpanda", "cpand" ]
+    },
     "Microsoft 365": {
       "AltNames": [ "ms365", "365", "office", "ms-office", "msoffice" ]
     },
@@ -17,6 +20,26 @@
       "AltNames": [ "sz", "szr", "resizer", "rsz", "rszr" ]
     },
     
+    // Web links
+      "Assinador.gov.br": {
+        "Target": "https://assinador.iti.br/assinatura/index.xhtml",
+        "AltNames": [ "assinar", "ass", "sign", "assinador", "assinatura" ]
+      },
+    
+    // Directories
+      "D:\\Projects\\Siemens": {
+        "AltNames": [ "siemens" ]
+      },
+      "D:\\Projects\\Shell": {
+        "AltNames": [ "shell" ]
+      },
+      "C:\\Shortcuts": {
+        "AltNames": [ "shortcuts", "shortcut", "shct", "shcts", "shcuts" ]
+      },
+      "D:\\Downloads": {
+        "AltNames": [ "downloads", "dls" ]
+      },
+
     // Microsof Office Group
       "Access": {
         "AltNames": [ "ms-acc", "ms-access", "msa", "acc" ]
@@ -56,12 +79,21 @@
                       "play-store", "gplay-store", "playstore", "gstor",
                       "store-google" ]
       },
+      "Nubank": {
+        "AltNames": [ "nu" ]
+      },
+      "BB": {
+        "AltNames": [ "bb" ]
+      },
       "Prime Video": {
         "AltNames": [ "pv", "apv", "prime", "pvideo", "primevideo", "amazon-pv",
                       "amazonpv" ]
       },
       "Magisk": {
         "AltNames": [ "mgisk", "mgsk" ]
+      },
+      "C6 Bank": {
+        "AltNames": [ "c6" ]
       },
     
     // Installed Web Apps
@@ -152,6 +184,15 @@
       "Google Images": {
         "AltNames": [ "images", "gimages", "g-images", "imgs" ]
       },
+      "SIGA": {
+        "AltNames": [ "siga" ]
+      },
+      "OLX": {
+        "AltNames": [ "br-olx", "olx-br", "olx.br", "br.olx", "brolx", "olxbr" ]
+      },
+      "Mercado Livre": {
+        "AltNames": [ "ml", "mlivre", "merclivr" ]
+      },
 
     // Games
       "Battle.net": {
@@ -206,8 +247,14 @@
       "Pinball FX": {
         "AltNames": [ "pinball", "pball", "pbfx", "pb-fx" ]
       },
+      "Portal Prelude RTX": {
+        "AltNames": [ "portal-prelude", "portal-prelude-rtx" ]
+      },
       "Command Conquer Generals - Zero Hour": {
         "AltNames": [ "cczh", "cnczh", "cnc-zh", "zh", "zero-hour" ]
+      },
+      "The Witcher Enhanced Edition": {
+        "AltNames": [ "tw1", "twee" ]
       },
       "Тoррент  Игpуxа": {
         "AltNames": [ "Torrent-Game" ]
@@ -215,12 +262,55 @@
       "Command & Conquer™ Remastered Collection": {
         "AltNames": [ "cnc" ]
       },
+      "INSIDE": {
+      },
+      "Command & Conquer 3 - Tiberium Wars": {
+        "AltNames": [ "cnc3", "cnc3-tw", "c&c3", "c&c3-tw" ]
+      },
+      "Command & Conquer 3 - Kane's Wrath": {
+        "AltNames": [ "cnc3-kw", "c&c3-kw" ]
+      },
+      "C&C - Red Alert 3": {
+        "AltNames": [ "cnc-ra3", "c&c3-ra3", "ra3" ]
+      },
+      "C&C - Red Alert 3 - Uprising": {
+        "AltNames": [ "cnc-ra3u", "c&c3-ra3u", "ra3u" ]
+      },
+      "d1x-rebirth": {
+        "AltNames": [ "d1x" ]
+      },
+      "d2x-rebirth": {
+        "AltNames": [ "d2x" ]
+      },
+      "Descent": {
+        "AltNames": [ "d1" ]
+      },
+      "Descent 2": {
+        "AltNames": [ "d2" ]
+      },
+    
+    // Wallets
+      "Exodus": {
+        "AltNames": [ "exd", "exd-wallet", "ex-wallet", "exw", "xw" ]
+      },
+      "Nimiq Wallet": {
+        "AltNames": [ "nimiq", "nim", "nimiq-wallet", "nim-wallet", "nimwallet",
+                      "nimwal" ]
+      },
+      "NIMIQ.WATCH Pool": {
+        "AltNames": [ "nimiq-watch", "nimwatch", "nimiq-watch-pool",
+                      "nim-watch-pool", "nimwatch-pool", "nim-watch", "nimpool",
+                      "nimwpool", "nimpl", "nimwpl", "nimp", "nimwp" ]
+      },
     
     // Other Programs Group
       "7-Zip File Manager": {
         "AltNames": [ "7zui", "7zipui", "7-zipui", "7-zui", "7z-ui", "7zip-ui",
                       "7-zip-ui", "7-z-ui", "7zgui", "7zipgui", "7-zipgui",
                       "7-zgui", "7z-gui", "7zip-gui", "7-zip-gui", "7-z-gui" ]
+      },
+      "Adobe Acrobat": {
+        "AltNames": [ "acrobat", "reader", "adobe-reader" ]
       },
       "Adobe Acrobat DC": {
         "AltNames": [ "acrobat", "reader", "adobe-reader" ]
@@ -298,6 +388,12 @@
       "Git Extensions": {
         "AltNames": [ "gitex", "gitext", "gitextension", "gitextensions",
                       "git-ex", "git-ext", "git-extension", "git-extensions" ]
+      },
+      "GNU Octave (CLI)": {
+        "AltNames": [ "octave-cli", "oct-cli" ]
+      },
+      "GNU Octave (GUI)": {
+        "AltNames": [ "octave", "oct", "octave-gui", "oct-gui" ]
       },
       "Google Chrome": {
         "AltNames": [ "chrome", "google-chrome" ]
@@ -454,6 +550,14 @@
       "Telegram": {
         "AltNames": [ "tel", "tg", "tgram", "tele", "teleg", "tlegram", "telgram",
                       "tlgram" ]
+      },
+      "Terminal": {
+        "AltNames": [ "term", "t", "win-term", "wt", "windows-terminal",
+                      "winterm", "wterm" ],
+        "ElevNames": [ "aterm", "awt", "awterm", "awinterm" ]
+      },
+      "Tftpd64": {
+        "AltNames": [ "tftpd" ]
       },
       "VirusTotal Uploader \\d+.\\d+": {
         "AltNames": [ "vt", "vtu", "vtup", "vt-up", "virus-total",
