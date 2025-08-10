@@ -1,7 +1,9 @@
 ﻿using Microsoft.Win32;
+using Microsoft.WindowsAPICodePack.Shell;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Runtime.InteropServices;
@@ -106,33 +108,36 @@ namespace MoveShortcuts
 
         public static Dictionary<string, string> GetUwpApps()
         {
-            ProcessStartInfo startInfo = new ProcessStartInfo();
-            startInfo.FileName = "..\\..\\..\\..\\CreateUWPList\\bin\\Debug\\net7.0\\CreateUWPList.exe";
-            startInfo.UseShellExecute = false;
-            startInfo.CreateNoWindow = true;
-            startInfo.RedirectStandardOutput = true;
-            startInfo.RedirectStandardError = true;
-
-            Process process = new Process();
-            process.StartInfo = startInfo;
-            process.Start();
-
-            string output = process.StandardOutput.ReadToEnd();
-            string error = process.StandardError.ReadToEnd();
-
-            process.WaitForExit();
-
-            int exitCode = process.ExitCode;
-
             var appNames = new Dictionary<string, string>();
-            var outputLines = output.Split("\r\n");
-            for (int it = 0; it < outputLines.Length; it += 2)
-            {
-                if (outputLines[it + 0] == "") break;
-                appNames[outputLines[it + 0]] = outputLines[it + 1];
-            }
+            foreach (var (name, appUserModelID) in GetUwpAppsInternal())
+                appNames[name] = ("X" + appUserModelID).Substring(1);
 
             return appNames;
+        }
+        private static List<(string Name, string AppUserModelID)> GetUwpAppsInternal()
+        {
+            var result = new List<(string Name, string AppUserModelID)>();
+
+            // Adding actions for UWP apps that are installed
+            // GUID taken from https://learn.microsoft.com/en-us/windows/win32/shell/knownfolderid
+            var FODLERID_AppsFolder = new Guid("{1e87508d-89c2-42f0-8a7e-645a0f50ca58}");
+            try
+            {
+                using (ShellObject appsFolder = (ShellObject)KnownFolderHelper.FromKnownFolderId(FODLERID_AppsFolder))
+                {
+                    Dictionary<string, string> appNames = new();
+                    foreach (var app in (IKnownFolder)appsFolder)
+                    {
+                        string name = app.Name;
+                        string appUserModelID = app.ParsingName;
+                        result.Add((app.Name, app.ParsingName));
+                    }
+                }
+            }
+            catch (TypeLoadException)
+            {
+            }
+            return result;
         }
 
         public static void CreateUWPShortcuts(
