@@ -4,8 +4,13 @@ using MoveShortcuts;
 using Newtonsoft.Json;
 using System.Drawing;
 using System.IO;
+using System.Linq;
+using System.Security.Policy;
 using System.Text.RegularExpressions;
 using static System.Net.Mime.MediaTypeNames;
+
+Console.WriteLine("Workdir: " + Directory.GetCurrentDirectory());
+Console.WriteLine("Executable: " + System.Reflection.Assembly.GetExecutingAssembly().Location);
 
 var log = new StreamWriter(File.Open("move-shortcuts.log", FileMode.Append));
 
@@ -103,48 +108,95 @@ Console.WriteLine("Collecting files to process:");
 HashSet<string> usedFilesNames = new();
 List<MyFileAction> actionsList = new();
 
+
+// 2.1 - source files that have a match in the configurations file:
+//      Can be either:
+//      - a direct match: the filename without extension is in the config file
+//      - a regex match: the filename without extension is matched by a config key representing a regex
+// Note: the options matched here, must have the Target property set to null.
+//       The targets are the links with the same name as the option by default.
+var fileOptionsWithoutTarget = fileOptions
+            .Where(kv => kv.Value.Target == null)
+            .ToDictionary(kv => kv.Key, kv => kv.Value);
 foreach (var file in Helpers.LogProgress(allSourceFiles, Path.GetFileName))
 {
     var fileName = Path.GetFileNameWithoutExtension(file);
     if (usedFilesNames.Contains(fileName))
         continue;
     usedFilesNames.Add(fileName);
-    if (!fileOptions.TryGetValue(fileName, out MyFileOptions? opts))
+    if (!fileOptionsWithoutTarget.TryGetValue(fileName, out MyFileOptions? opts))
     {
-        var keyMatch = fileOptions.Keys
+        var keyMatch = fileOptionsWithoutTarget.Keys
             .Where(x => !Path.IsPathFullyQualified(x))
             .FirstOrDefault(
                 k => Regex.IsMatch(fileName, "^" + k + "$", RegexOptions.IgnoreCase));
         if (keyMatch != null)
-            opts = fileOptions[keyMatch];
+            opts = fileOptionsWithoutTarget[keyMatch];
     }
     var fileAttr = (FILE_ATTRIBUTES)File.GetAttributes(file);
     var isOffline = (fileAttr & FILE_ATTRIBUTES.OFFLINE) != 0;
     var isRecallOnAccess = (fileAttr & FILE_ATTRIBUTES.RECALL_ON_DATA_ACCESS) != 0;
     if (opts != null)
     {
+        opts.Action = opts.Action & (~FileAction.FileLink) & (~FileAction.FolderLink) & (~FileAction.InternetLink);
         actionsList.Add(new(file, fileName, opts, isOffline || isRecallOnAccess));
     }
 }
 
-foreach (var file in fileOptions.Keys.Where(Path.IsPathFullyQualified))
+// 2.2 - options that represent a full path for a file/folder that actually exists
+// Deprectated: this option is depracated in favor of using fully qualified Target property.
+//              See section 2.3
+foreach (var file in fileOptionsWithoutTarget.Keys.Where(Path.IsPathFullyQualified))
 {
     if (!File.Exists(file) && !Directory.Exists(file))
         continue;
     var fileName = Path.GetFileNameWithoutExtension(file);
-    var opts = fileOptions[file];
+    var opts = fileOptionsWithoutTarget[file];
+    opts.Action = opts.Action & (FileAction.FileLink | FileAction.FolderLink);
     var fileAttr = (FILE_ATTRIBUTES)File.GetAttributes(file);
     var isOffline = (fileAttr & FILE_ATTRIBUTES.OFFLINE) != 0;
     var isRecallOnAccess = (fileAttr & FILE_ATTRIBUTES.RECALL_ON_DATA_ACCESS) != 0;
     actionsList.Add(new(file, fileName, opts, isOffline || isRecallOnAccess));
 }
 
-foreach (var key in fileOptions.Keys)
+// If there is an option not matching files found in the Desktop, Start Menu or UWP Apps,
+// then the option can be a standalone option, meaning that it can represent links or items
+// that must be created dynamicaly. The following sections are for these types of options.
+// Note: all of these options have the Target property set to something.
+//       The Target propery indicates what type of items is this.
+//       - URL: when Target starts with http:// or https://
+//       - Path: when Target refers to an absolute Path, i.e. it starts with something like C:/
+//       - Everything: Target refers to items found by using Everythin software, i.e. es filename.exe
+//       - Where: Target refers to items found by using the "where" command, i.e. where filename
+// Note: when using Everything or where command, the first item that is listed is used as the target
+
+var fileOptionsWithTarget = fileOptions
+            .Where(kv => kv.Value.Target != null)
+            .ToDictionary(kv => kv.Key, kv => kv.Value);
+
+// 2.3 - options that have a Target property
+foreach (var key in fileOptionsWithTarget.Keys)
 {
-    var opts = fileOptions[key];
-    if (opts.Target == null)
-        continue;
-    actionsList.Add(new(opts.Target, key, opts, false));
+    var opts = fileOptionsWithTarget[key];
+    if (opts.Target.StartsWith("http://") || opts.Target.StartsWith("https://"))
+    {
+    opts.Action = opts.Action & (FileAction.InternetLink);
+        actionsList.Add(new(opts.Target, key, opts, false));
+    }
+    else if (Path.IsPathFullyQualified(opts.Target))
+    {
+        opts.Action = opts.Action & (FileAction.FileLink | FileAction.FolderLink);
+        actionsList.Add(new(opts.Target, key, opts, false));
+    }
+    else
+    {
+        opts.Action = opts.Action & (FileAction.FileLink | FileAction.FolderLink);
+        var cmd = opts.Target.Split(" ", 2);
+        var target = Helpers.RunCommandAndGetFirstLine(cmd[0], cmd[1]);
+        if (string.IsNullOrWhiteSpace(target))
+            continue;
+        actionsList.Add(new(target, key, opts, false));
+    }
 }
 
 actionsList.Sort(
@@ -227,8 +279,32 @@ foreach (var action in Helpers.LogProgress(actionsList, a => a.FileName))
         }
     }
 
-    if ((action.Options.Action & FileAction.FolderLink) != 0)
+    if ((action.Options.Action & FileAction.FileLink) != 0)
+    {
+        if (File.Exists(targetObjectToOpen) && !Helpers.HasExt(targetObjectToOpen, ".lnk", ".url"))
         {
+            void CreateLocalLink(string name, bool elevated)
+            {
+                var altFullPathLnk = Path.Combine(shortcuts, name) + ".lnk";
+                Helpers.CreateShortcut(altFullPathLnk, targetObjectToOpen);
+                MakeGroups(shortcuts, action, altFullPathLnk);
+                if (elevated)
+                    Helpers.MakeElevatedLink(altFullPathLnk);
+            }
+            CreateLocalLink(action.FileName, false);
+            foreach (var altname in action.Options.AltNames)
+            {
+                CreateLocalLink(altname, false);
+            }
+            foreach (var altname in action.Options.ElevNames)
+            {
+                CreateLocalLink(altname, true);
+            }
+        }
+    }
+
+    if ((action.Options.Action & FileAction.FolderLink) != 0)
+    {
         if (Directory.Exists(targetObjectToOpen))
         {
             void CreateDirLinks(string name)

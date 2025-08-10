@@ -199,5 +199,38 @@ namespace MoveShortcuts
                 return null;
             }
         }
+
+        public static string RunCommandAndGetFirstLine(string command, string argument)
+        {
+            try
+            {
+                // Set up the process start info
+                var processStartInfo = new ProcessStartInfo
+                {
+                    FileName = command,             // The command to run, e.g., "es"
+                    Arguments = argument,           // The argument, e.g., the filename
+                    RedirectStandardOutput = true,  // To capture the output
+                    UseShellExecute = false,        // Do not use shell execution to allow redirection
+                    CreateNoWindow = true           // Prevents creating a command window
+                };
+
+                using (var process = Process.Start(processStartInfo))  // Start the process
+                {
+                    using (var reader = process.StandardOutput)  // Read the output
+                    {
+                        // Read the first line of output
+                        string output = reader.ReadLine();
+                        return output; // Returns the first line or null if no output
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // In case of error (e.g., command not found), return null
+                Console.WriteLine($"Error: {ex.Message}");
+                return null;
+            }
+        }
+
     }
 }

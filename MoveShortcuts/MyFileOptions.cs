@@ -6,7 +6,8 @@
             = FileAction.MakeShortcut
             | FileAction.DeleteDesktopLink
             | FileAction.FolderLink
-            | FileAction.InternetLink;
+            | FileAction.InternetLink
+            | FileAction.FileLink;
 
         /// <summary>
         /// Instructs the creation of alternative names for a given file or folder

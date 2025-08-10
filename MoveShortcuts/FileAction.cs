@@ -26,5 +26,10 @@
         /// Creates an internet link if it's an URL
         /// </summary>
         InternetLink = 8,
+
+        /// <summary>
+        /// Creates a file link if it's a file.
+        /// </summary>
+        FileLink = 16,
     }
 }
