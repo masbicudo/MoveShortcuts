@@ -6,7 +6,9 @@
 
         public bool? getFavIcon = false;
 
-        public Dictionary<string, MyFileOptions> fileOptions = new()
+        public Dictionary<string, MyFileOptions> fileOptions = new();
+
+        public static Dictionary<string, MyFileOptions> defaultFileOptions = new()
         {
             // Default examples on how to use the settings file.
 

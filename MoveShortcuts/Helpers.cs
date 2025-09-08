@@ -73,7 +73,7 @@ namespace MoveShortcuts
             return (x, y) => -comparer(x, y);
         }
 
-        public static bool CreateShortcut(string linkfile, string target, string icon = null)
+        public static bool CreateShortcut(string linkfile, string target, string icon = null, string workdir = null)
         {
             Type t = Type.GetTypeFromCLSID(new Guid("72C24DD5-D70A-438B-8A42-98424B88AFB8")); //Windows Script Host Shell Object
             dynamic shell = Activator.CreateInstance(t);
@@ -85,6 +85,7 @@ namespace MoveShortcuts
                     try
                     {
                         lnk.TargetPath = target;
+                        if (workdir != null) lnk.WorkingDirectory = workdir;
                         if (icon != null) lnk.IconLocation = icon;
                         lnk.Save();
                         return true;

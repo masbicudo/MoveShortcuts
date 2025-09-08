@@ -26,6 +26,7 @@ if (File.Exists(optsFileName))
 else
 {
     Console.WriteLine("New data file: " + optsFileName);
+    options.fileOptions = Settings.defaultFileOptions;
     var json = JsonConvert.SerializeObject(options, Formatting.Indented);
     File.WriteAllText(optsFileName, json);
 }
@@ -288,7 +289,10 @@ foreach (var action in Helpers.LogProgress(actionsList, a => a.FileName))
             void CreateLocalLink(string name, bool elevated)
             {
                 var altFullPathLnk = Path.Combine(shortcuts, name) + ".lnk";
-                Helpers.CreateShortcut(altFullPathLnk, targetObjectToOpen);
+                string workdir = null;
+                if (action.Options.WorkDir != null)
+                    workdir = action.Options.WorkDir.Replace("$TargetDir", Path.GetDirectoryName(targetObjectToOpen));
+                Helpers.CreateShortcut(altFullPathLnk, targetObjectToOpen, workdir: workdir);
                 MakeGroups(shortcuts, action, altFullPathLnk);
                 if (elevated)
                     Helpers.MakeElevatedLink(altFullPathLnk);
