@@ -19,11 +19,13 @@ var options = new Settings();
 var optsFileName = "move-shortcuts-options.json";
 if (File.Exists(optsFileName))
 {
+    Console.WriteLine("Found data file: " + optsFileName);
     var json = File.ReadAllText(optsFileName);
     options = JsonConvert.DeserializeObject<Settings>(json);
 }
 else
 {
+    Console.WriteLine("New data file: " + optsFileName);
     var json = JsonConvert.SerializeObject(options, Formatting.Indented);
     File.WriteAllText(optsFileName, json);
 }
