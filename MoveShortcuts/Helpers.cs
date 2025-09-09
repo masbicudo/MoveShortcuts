@@ -233,5 +233,135 @@ namespace MoveShortcuts
             }
         }
 
+        public static string SelfElevatedPs1Template { get; } = """
+            # Self-elevate the script if required
+            if (-Not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator')) {
+                if ([int](Get-CimInstance -Class Win32_OperatingSystem | Select-Object -ExpandProperty BuildNumber) -ge 6000) {
+                    $CommandLine = "-File `"" + $MyInvocation.MyCommand.Path + "`" " + $MyInvocation.UnboundArguments
+                    Start-Process -FilePath PowerShell.exe -Verb Runas -ArgumentList $CommandLine
+                    Exit
+                }
+            }
+
+            SCRIPT_PLACEHOLDER
+            """;
+
+        public static void CreatePowerShellProxy(string altFullPathPs1, string targetObjectToOpen, bool elevated, string? workdir)
+        {
+            var script = $"& \"{targetObjectToOpen}\" @args";
+
+            if (workdir != null)
+            {
+                script = $"""
+                    cd "{workdir}"
+                    {script}
+                    """;
+            }
+            if (elevated)
+            {
+                script = SelfElevatedPs1Template.Replace("SCRIPT_PLACEHOLDER", script);
+            }
+            File.WriteAllText(altFullPathPs1, script);
+        }
+
+        public static string SelfElevatedCmdTemplate { get; } = """
+            :: ----------------------------------------
+            :: Self-elevating CMD script with argument forwarding
+            :: ----------------------------------------
+
+            :: Function: Check if running as admin
+            net session >nul 2>&1
+            if %errorLevel% neq 0 (
+                echo Requesting administrative privileges...
+
+                :: Build properly quoted argument list
+                set "args="
+                :loop
+                if "%~1"=="" goto endloop
+                set "args=%args% \"%~1\""
+                shift
+                goto loop
+                :endloop
+
+                :: Relaunch script elevated with arguments
+                powershell -Command "Start-Process '%~f0' -ArgumentList %args% -Verb RunAs"
+                exit /b
+            )
+
+            :: --- Script continues here as admin ---
+            SCRIPT_PLACEHOLDER
+            """;
+
+        public static void CreateCommandPromptProxy(string altFullPathCmd, string targetObjectToOpen, bool elevated, string? workdir)
+        {
+            var script = $"\"{targetObjectToOpen}\" %*";
+
+            if (workdir != null)
+            {
+                script = $"""
+                    cd "{workdir}"
+                    {script}
+                    """;
+            }
+            if (elevated)
+            {
+                script = SelfElevatedCmdTemplate.Replace("SCRIPT_PLACEHOLDER", script);
+            }
+            script = $"@echo off\r\n{script}";
+            File.WriteAllText(altFullPathCmd, script);
+        }
+
+        public static string SelfElevatedShTemplate { get; } = """
+            #!/usr/bin/env bash
+            # ==========================================
+            # Self-elevating Git Bash script on Windows
+            # ==========================================
+
+            # Function to check if running as admin
+            is_admin() {
+                # Try a command that requires admin privileges
+                net session > /dev/null 2>&1
+            }
+
+            if ! is_admin; then
+                echo "Requesting administrative privileges..."
+
+                # Build argument string with proper quoting
+                args=""
+                for arg in "$@"; do
+                    # Escape double quotes
+                    safe_arg="${arg//\"/\\\"}"
+                    args="$args \"$safe_arg\""
+                done
+
+                # Relaunch the script elevated via PowerShell
+                powershell.exe -Command "Start-Process bash -ArgumentList '-c \"${PWD}/$(basename "$0")$args\"' -Verb RunAs"
+
+                exit 0
+            fi
+
+            # --------------------------
+            # Script continues here as admin
+            # --------------------------
+            SCRIPT_PLACEHOLDER
+            """;
+
+        public static void CreateGitBashProxy(string altFullPathSh, string targetObjectToOpen, bool elevated, string? workdir)
+        {
+            var script = $"\"{targetObjectToOpen}\" $@";
+
+            if (workdir != null)
+            {
+                script = $"""
+                    cd "{workdir}"
+                    {script}
+                    """;
+            }
+            if (elevated)
+            {
+                script = SelfElevatedShTemplate.Replace("SCRIPT_PLACEHOLDER", script);
+            }
+            File.WriteAllText(altFullPathSh, script);
+        }
     }
 }

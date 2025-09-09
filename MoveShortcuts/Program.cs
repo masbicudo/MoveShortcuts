@@ -288,14 +288,35 @@ foreach (var action in Helpers.LogProgress(actionsList, a => a.FileName))
         {
             void CreateLocalLink(string name, bool elevated)
             {
-                var altFullPathLnk = Path.Combine(shortcuts, name) + ".lnk";
                 string workdir = null;
                 if (action.Options.WorkDir != null)
                     workdir = action.Options.WorkDir.Replace("$TargetDir", Path.GetDirectoryName(targetObjectToOpen));
-                Helpers.CreateShortcut(altFullPathLnk, targetObjectToOpen, workdir: workdir);
-                MakeGroups(shortcuts, action, altFullPathLnk);
-                if (elevated)
-                    Helpers.MakeElevatedLink(altFullPathLnk);
+                var linTypes = action.Options.LinkTypes;
+                if (linTypes.Count == 0)
+                    linTypes = new() { "lnk" };
+                if (linTypes.Contains("lnk", StringComparer.OrdinalIgnoreCase))
+                {
+                    var altFullPathLnk = Path.Combine(shortcuts, name) + ".lnk";
+                    Helpers.CreateShortcut(altFullPathLnk, targetObjectToOpen, workdir: workdir);
+                    MakeGroups(shortcuts, action, altFullPathLnk);
+                    if (elevated)
+                        Helpers.MakeElevatedLink(altFullPathLnk);
+                }
+                if (linTypes.Contains("ps1", StringComparer.OrdinalIgnoreCase))
+                {
+                    var altFullPathPs1 = Path.Combine(shortcuts, name) + ".ps1";
+                    Helpers.CreatePowerShellProxy(altFullPathPs1, targetObjectToOpen, elevated, workdir);
+                }
+                if (linTypes.Contains("cmd", StringComparer.OrdinalIgnoreCase))
+                {
+                    var altFullPathCmd = Path.Combine(shortcuts, name) + ".cmd";
+                    Helpers.CreateCommandPromptProxy(altFullPathCmd, targetObjectToOpen, elevated, workdir);
+                }
+                if (linTypes.Contains("sh", StringComparer.OrdinalIgnoreCase))
+                {
+                    var altFullPathSh = Path.Combine(shortcuts, name) + ".sh";
+                    Helpers.CreateGitBashProxy(altFullPathSh, targetObjectToOpen, elevated, workdir);
+                }
             }
             CreateLocalLink(action.FileName, false);
             foreach (var altname in action.Options.AltNames)
