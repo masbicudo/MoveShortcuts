@@ -10,6 +10,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using System.Xml.Linq;
 
 namespace MoveShortcuts
 {
@@ -84,7 +85,13 @@ namespace MoveShortcuts
                     var lnk = shell.CreateShortcut(linkfile);
                     try
                     {
-                        lnk.TargetPath = target;
+                        if (target.StartsWith("shell:AppsFolder\\"))
+                        {
+                            lnk.TargetPath = target;
+                            lnk.Arguments = "";
+                        }
+                        else
+                            lnk.TargetPath = target;
                         if (workdir != null) lnk.WorkingDirectory = workdir;
                         if (icon != null) lnk.IconLocation = icon;
                         lnk.Save();
@@ -131,7 +138,7 @@ namespace MoveShortcuts
                     {
                         string name = app.Name;
                         string appUserModelID = app.ParsingName;
-                        result.Add((app.Name, app.ParsingName));
+                        result.Add((name, appUserModelID));
                     }
                 }
             }
