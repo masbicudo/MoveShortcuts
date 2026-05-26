@@ -505,7 +505,7 @@ namespace MoveShortcuts
                 Dictionary<string, string> appNames
             )
         {
-            var matcher = new UwpShortcutOptionMatcher(fileOptions);
+            var matcher = new FileOptionMatcher(fileOptions, includeFullyQualifiedKeys: false);
             if (!matcher.HasCandidates)
                 return;
 
@@ -531,47 +531,6 @@ namespace MoveShortcuts
                         );
                 }
                 it++;
-            }
-        }
-
-        private sealed class UwpShortcutOptionMatcher
-        {
-            private readonly Dictionary<string, MyFileOptions> _exactOptions;
-            private readonly List<(Regex Pattern, MyFileOptions Options)> _patternOptions;
-
-            public UwpShortcutOptionMatcher(Dictionary<string, MyFileOptions> fileOptions)
-            {
-                _exactOptions = new Dictionary<string, MyFileOptions>(StringComparer.OrdinalIgnoreCase);
-                foreach (var option in fileOptions)
-                {
-                    if (!_exactOptions.ContainsKey(option.Key))
-                        _exactOptions[option.Key] = option.Value;
-                }
-
-                _patternOptions = fileOptions
-                    .Where(kv => IsUwpShortcutKey(kv.Key))
-                    .Select(kv => (new Regex("^" + kv.Key + "$", RegexOptions.IgnoreCase), kv.Value))
-                    .ToList();
-            }
-
-            public bool HasCandidates => _patternOptions.Count > 0;
-
-            public bool TryGetOptions(string appName, out MyFileOptions? options)
-            {
-                if (_exactOptions.TryGetValue(appName, out options))
-                    return true;
-
-                foreach (var patternOption in _patternOptions)
-                {
-                    if (patternOption.Pattern.IsMatch(appName))
-                    {
-                        options = patternOption.Options;
-                        return true;
-                    }
-                }
-
-                options = null;
-                return false;
             }
         }
 

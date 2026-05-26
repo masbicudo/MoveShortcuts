@@ -156,21 +156,14 @@ List<MyFileAction> actionsList = new();
 var fileOptionsWithoutTarget = fileOptions
             .Where(kv => kv.Value.Target == null)
             .ToDictionary(kv => kv.Key, kv => kv.Value);
+var fileOptionMatcher = new FileOptionMatcher(fileOptionsWithoutTarget, includeFullyQualifiedKeys: false);
 foreach (var file in Helpers.LogProgress(allSourceFiles, Path.GetFileName))
 {
     var fileName = Path.GetFileNameWithoutExtension(file);
     if (usedFilesNames.Contains(fileName))
         continue;
     usedFilesNames.Add(fileName);
-    if (!fileOptionsWithoutTarget.TryGetValue(fileName, out MyFileOptions? opts))
-    {
-        var keyMatch = fileOptionsWithoutTarget.Keys
-            .Where(x => !Path.IsPathFullyQualified(x))
-            .FirstOrDefault(
-                k => Regex.IsMatch(fileName, "^" + k + "$", RegexOptions.IgnoreCase));
-        if (keyMatch != null)
-            opts = fileOptionsWithoutTarget[keyMatch];
-    }
+    fileOptionMatcher.TryGetOptions(fileName, out MyFileOptions? opts);
     var fileAttr = (FILE_ATTRIBUTES)File.GetAttributes(file);
     var isOffline = (fileAttr & FILE_ATTRIBUTES.OFFLINE) != 0;
     var isRecallOnAccess = (fileAttr & FILE_ATTRIBUTES.RECALL_ON_DATA_ACCESS) != 0;
