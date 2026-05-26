@@ -30,6 +30,12 @@ namespace MoveShortcuts
         private static bool _progressLineActive;
         private static int _progressLineWidth;
         private static readonly Dictionary<CommandPathIndexKey, CommandPathIndex> _commandPathIndexes = new();
+        private static readonly Lazy<object> _shortcutShell = new(CreateShortcutShell);
+
+        static Helpers()
+        {
+            AppDomain.CurrentDomain.ProcessExit += (_, _) => ReleaseShortcutShell();
+        }
 
         public static string ToString<T>(T o) => $"{o}";
 
@@ -409,41 +415,47 @@ namespace MoveShortcuts
 
         public static bool CreateShortcut(string linkfile, string target, string icon = null, string workdir = null)
         {
-            Type t = Type.GetTypeFromCLSID(new Guid("72C24DD5-D70A-438B-8A42-98424B88AFB8")); //Windows Script Host Shell Object
-            dynamic shell = Activator.CreateInstance(t);
+            dynamic shell = _shortcutShell.Value;
             try
             {
+                var lnk = shell.CreateShortcut(linkfile);
                 try
                 {
-                    var lnk = shell.CreateShortcut(linkfile);
-                    try
+                    if (target.StartsWith("shell:AppsFolder\\"))
                     {
-                        if (target.StartsWith("shell:AppsFolder\\"))
-                        {
-                            lnk.TargetPath = target;
-                            lnk.Arguments = "";
-                        }
-                        else
-                            lnk.TargetPath = target;
-                        if (workdir != null) lnk.WorkingDirectory = workdir;
-                        if (icon != null) lnk.IconLocation = icon;
-                        lnk.Save();
-                        return true;
+                        lnk.TargetPath = target;
+                        lnk.Arguments = "";
                     }
-                    finally
-                    {
-                        Marshal.FinalReleaseComObject(lnk);
-                    }
+                    else
+                        lnk.TargetPath = target;
+                    if (workdir != null) lnk.WorkingDirectory = workdir;
+                    if (icon != null) lnk.IconLocation = icon;
+                    lnk.Save();
+                    return true;
                 }
                 finally
                 {
-                    Marshal.FinalReleaseComObject(shell);
+                    Marshal.FinalReleaseComObject(lnk);
                 }
             }
             catch (Exception ex)
             {
                 return false;
             }
+        }
+
+        private static object CreateShortcutShell()
+        {
+            Type t = Type.GetTypeFromCLSID(new Guid("72C24DD5-D70A-438B-8A42-98424B88AFB8")); // Windows Script Host Shell Object
+            return Activator.CreateInstance(t);
+        }
+
+        private static void ReleaseShortcutShell()
+        {
+            if (!_shortcutShell.IsValueCreated)
+                return;
+
+            Marshal.FinalReleaseComObject(_shortcutShell.Value);
         }
 
 
