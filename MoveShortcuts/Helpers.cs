@@ -29,13 +29,27 @@ namespace MoveShortcuts
         }
 
         public static bool WouldShadowExternalCommand(string shortcutsRoot, string outputPath)
-            => WouldShadowExternalCommand(
+            => GetExternalCommandConflict(
+                shortcutsRoot,
+                outputPath,
+                Environment.GetEnvironmentVariable("PATH") ?? "",
+                Environment.GetEnvironmentVariable("PATHEXT") ?? "") != null;
+
+        public static bool WouldShadowExternalCommand(
+            string shortcutsRoot,
+            string outputPath,
+            string pathValue,
+            string pathExtValue)
+            => GetExternalCommandConflict(shortcutsRoot, outputPath, pathValue, pathExtValue) != null;
+
+        public static string? GetExternalCommandConflict(string shortcutsRoot, string outputPath)
+            => GetExternalCommandConflict(
                 shortcutsRoot,
                 outputPath,
                 Environment.GetEnvironmentVariable("PATH") ?? "",
                 Environment.GetEnvironmentVariable("PATHEXT") ?? "");
 
-        public static bool WouldShadowExternalCommand(
+        public static string? GetExternalCommandConflict(
             string shortcutsRoot,
             string outputPath,
             string pathValue,
@@ -43,7 +57,7 @@ namespace MoveShortcuts
         {
             var commandName = Path.GetFileNameWithoutExtension(outputPath);
             if (string.IsNullOrWhiteSpace(commandName))
-                return false;
+                return null;
 
             var pathEntries = pathValue
                 .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
@@ -65,12 +79,11 @@ namespace MoveShortcuts
                         continue;
 
                     var fullPath = Path.GetFullPath(path);
-                    if (!IsPathInside(shortcutsRoot, fullPath))
-                        return true;
+                    return IsPathInside(shortcutsRoot, fullPath) ? null : fullPath;
                 }
             }
 
-            return false;
+            return null;
         }
 
         public static bool IsPathInside(string root, string path)
@@ -83,37 +96,57 @@ namespace MoveShortcuts
 
         public static bool CopyShortcutOutput(string shortcutsRoot, string source, string target)
         {
-            if (WouldShadowExternalCommand(shortcutsRoot, target))
+            var conflict = GetExternalCommandConflict(shortcutsRoot, target);
+            if (conflict != null)
             {
-                Console.WriteLine($"Skipping {Path.GetFileName(target)}: command exists outside {shortcutsRoot}");
+                Console.WriteLine($"Skipping {Path.GetFileName(target)}: conflicts with {conflict}");
                 return false;
             }
 
-            Copy(source, target);
-            return true;
+            return TryWriteShortcutOutput(target, () => Copy(source, target));
         }
 
         public static bool WriteShortcutOutput(string shortcutsRoot, string target, string contents)
         {
-            if (WouldShadowExternalCommand(shortcutsRoot, target))
+            var conflict = GetExternalCommandConflict(shortcutsRoot, target);
+            if (conflict != null)
             {
-                Console.WriteLine($"Skipping {Path.GetFileName(target)}: command exists outside {shortcutsRoot}");
+                Console.WriteLine($"Skipping {Path.GetFileName(target)}: conflicts with {conflict}");
                 return false;
             }
 
-            File.WriteAllText(target, contents);
-            return true;
+            return TryWriteShortcutOutput(target, () => File.WriteAllText(target, contents));
         }
 
         public static bool CreateShortcutOutput(string shortcutsRoot, string linkfile, string target, string icon = null, string workdir = null)
         {
-            if (WouldShadowExternalCommand(shortcutsRoot, linkfile))
+            var conflict = GetExternalCommandConflict(shortcutsRoot, linkfile);
+            if (conflict != null)
             {
-                Console.WriteLine($"Skipping {Path.GetFileName(linkfile)}: command exists outside {shortcutsRoot}");
+                Console.WriteLine($"Skipping {Path.GetFileName(linkfile)}: conflicts with {conflict}");
                 return false;
             }
 
             return CreateShortcut(linkfile, target, icon, workdir);
+        }
+
+        private static bool TryWriteShortcutOutput(string target, Action write)
+        {
+            try
+            {
+                write();
+                return true;
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                Console.WriteLine($"Skipping {Path.GetFileName(target)}: access denied ({ex.Message})");
+                return false;
+            }
+            catch (IOException ex)
+            {
+                Console.WriteLine($"Skipping {Path.GetFileName(target)}: write failed ({ex.Message})");
+                return false;
+            }
         }
 
         public static bool HasExt(string filename, params string[] extensions)
@@ -135,27 +168,69 @@ namespace MoveShortcuts
         {
             if (transformer == null)
                 transformer = ToString<T>;
-            int width = Console.BufferWidth;
+            var useInlineProgress = TryGetConsoleWidth(out var width);
             int counter = 1;
             int total = list.Count();
             foreach (var item in list)
             {
-                var (left, top) = Console.GetCursorPosition();
                 var msg = $"{counter}/{total}: {transformer(item)}";
-                if (msg.Length > width)
+                if (!useInlineProgress)
                 {
-                    msg = new string(msg.Take(width - 3).ToArray()) + "...";
+                    Console.WriteLine(msg);
+                    yield return item;
+                    counter++;
+                    continue;
                 }
-                else
+
+                try
                 {
-                    msg = msg + new string(' ', width - msg.Length);
+                    var (left, top) = Console.GetCursorPosition();
+                    if (msg.Length > width)
+                    {
+                        msg = new string(msg.Take(width - 3).ToArray()) + "...";
+                    }
+                    else
+                    {
+                        msg = msg + new string(' ', width - msg.Length);
+                    }
+                    Console.Write(msg);
+                    Console.SetCursorPosition(left, top);
                 }
-                Console.Write(msg);
-                Console.SetCursorPosition(left, top);
+                catch (IOException)
+                {
+                    useInlineProgress = false;
+                    Console.WriteLine(msg);
+                }
+                catch (InvalidOperationException)
+                {
+                    useInlineProgress = false;
+                    Console.WriteLine(msg);
+                }
                 yield return item;
                 counter++;
             }
             Console.WriteLine();
+        }
+
+        private static bool TryGetConsoleWidth(out int width)
+        {
+            width = 0;
+            if (Console.IsOutputRedirected)
+                return false;
+
+            try
+            {
+                width = Console.BufferWidth;
+                return width > 3;
+            }
+            catch (IOException)
+            {
+                return false;
+            }
+            catch (InvalidOperationException)
+            {
+                return false;
+            }
         }
         public static Comparison<T> ReverseComparer<T>(Comparison<T> comparer)
         {

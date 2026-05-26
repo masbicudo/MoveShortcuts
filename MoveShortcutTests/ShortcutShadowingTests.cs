@@ -42,6 +42,22 @@ namespace MoveShortcutTests
         }
 
         [TestMethod]
+        public void GetExternalCommandConflict_ReturnsFirstExternalCommandPath()
+        {
+            var externalCommand = Path.Combine(_externalBin, "ollama.exe");
+            File.WriteAllText(externalCommand, "");
+            var outputPath = Path.Combine(_shortcuts, "ollama.lnk");
+
+            var conflict = Helpers.GetExternalCommandConflict(
+                _shortcuts,
+                outputPath,
+                _externalBin,
+                ".EXE;.LNK");
+
+            Assert.AreEqual(Path.GetFullPath(externalCommand), conflict, ignoreCase: true);
+        }
+
+        [TestMethod]
         public void WouldShadowExternalCommand_ReturnsFalse_WhenCommandOnlyExistsInsideShortcuts()
         {
             File.WriteAllText(Path.Combine(_shortcuts, "ollama.lnk"), "");
@@ -51,6 +67,23 @@ namespace MoveShortcutTests
                 _shortcuts,
                 outputPath,
                 _shortcuts,
+                ".EXE;.LNK");
+
+            Assert.IsFalse(shadows);
+        }
+
+        [TestMethod]
+        public void WouldShadowExternalCommand_ReturnsFalse_WhenShortcutResolvesBeforeExternalCommand()
+        {
+            File.WriteAllText(Path.Combine(_shortcuts, "ollama.lnk"), "");
+            File.WriteAllText(Path.Combine(_externalBin, "ollama.exe"), "");
+            var outputPath = Path.Combine(_shortcuts, "ollama.lnk");
+            var pathValue = string.Join(Path.PathSeparator, _shortcuts, _externalBin);
+
+            var shadows = Helpers.WouldShadowExternalCommand(
+                _shortcuts,
+                outputPath,
+                pathValue,
                 ".EXE;.LNK");
 
             Assert.IsFalse(shadows);
