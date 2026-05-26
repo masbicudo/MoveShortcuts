@@ -90,6 +90,14 @@ move-shortcuts-uwp-cache.json
 Normal runs reuse this cache while the Windows package signature is unchanged.
 Use `--refresh-uwp-cache` to rebuild it from AppsFolder.
 
+Dynamic targets such as `es tool.exe` and `where tool.exe` are cached in:
+
+```bash
+move-shortcuts-target-cache.json
+```
+
+The cached target is reused only while the resolved file or folder still exists.
+
 ---
 
 ## Design principles

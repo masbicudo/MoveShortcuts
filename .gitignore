@@ -365,3 +365,5 @@ FodyWeavers.xsd
 /MoveShortcuts/move-shortcuts-options.json
 /move-shortcuts-uwp-cache.json
 /MoveShortcuts/move-shortcuts-uwp-cache.json
+/move-shortcuts-target-cache.json
+/MoveShortcuts/move-shortcuts-target-cache.json

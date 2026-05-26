@@ -230,7 +230,15 @@ foreach (var key in fileOptionsWithTarget.Keys)
     else
     {
         var cmd = opts.Target.Split(" ", 2);
-        var target = Helpers.RunCommandAndGetFirstLine(cmd[0], cmd[1]);
+        if (cmd.Length < 2)
+            continue;
+
+        var target = ResolvedTargetCacheProvider.Resolve(
+            ResolvedTargetCacheProvider.DefaultCacheFileName,
+            cmd[0],
+            cmd[1],
+            Helpers.RunCommandAndGetFirstLine,
+            message => Helpers.WriteLine(message));
         if (string.IsNullOrWhiteSpace(target))
             continue;
         opts.Action = opts.Action & ActionsForResolvedTarget(target);
@@ -811,6 +819,13 @@ static void PrintHelp()
 
           --refresh-uwp-cache
               Ignore any existing UWP app cache and rebuild it from AppsFolder.
+
+        Caches:
+          move-shortcuts-uwp-cache.json
+              Stores AppsFolder enumeration while the Windows package signature is unchanged.
+
+          move-shortcuts-target-cache.json
+              Stores resolved external targets such as "es tool.exe" while the target still exists.
 
         Configuration:
           Reads move-shortcuts-options.json from the current working directory.
