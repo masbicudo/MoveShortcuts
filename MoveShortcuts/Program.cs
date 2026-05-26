@@ -178,26 +178,34 @@ var fileOptionsWithTarget = fileOptions
             .ToDictionary(kv => kv.Key, kv => kv.Value);
 
 // 2.3 - options that have a Target property
+FileAction ActionsForResolvedTarget(string target)
+{
+    if (File.Exists(target) && Helpers.HasExt(target, ".lnk", ".url"))
+        return FileAction.MakeShortcut;
+
+    return FileAction.FileLink | FileAction.FolderLink;
+}
+
 foreach (var key in fileOptionsWithTarget.Keys)
 {
     var opts = fileOptionsWithTarget[key];
     if (opts.Target.StartsWith("http://") || opts.Target.StartsWith("https://"))
     {
-    opts.Action = opts.Action & (FileAction.InternetLink);
+        opts.Action = opts.Action & (FileAction.InternetLink);
         actionsList.Add(new(opts.Target, key, opts, false));
     }
     else if (Path.IsPathFullyQualified(opts.Target))
     {
-        opts.Action = opts.Action & (FileAction.FileLink | FileAction.FolderLink);
+        opts.Action = opts.Action & ActionsForResolvedTarget(opts.Target);
         actionsList.Add(new(opts.Target, key, opts, false));
     }
     else
     {
-        opts.Action = opts.Action & (FileAction.FileLink | FileAction.FolderLink);
         var cmd = opts.Target.Split(" ", 2);
         var target = Helpers.RunCommandAndGetFirstLine(cmd[0], cmd[1]);
         if (string.IsNullOrWhiteSpace(target))
             continue;
+        opts.Action = opts.Action & ActionsForResolvedTarget(target);
         actionsList.Add(new(target, key, opts, false));
     }
 }
@@ -260,8 +268,8 @@ foreach (var action in Helpers.LogProgress(actionsList, a => a.FileName))
                 var altFullPathLnk = Path.Combine(shortcuts, name) + ".lnk";
                 if (iconFullPath != null && File.Exists(iconFullPath))
                 {
-                    Helpers.CreateShortcut(altFullPathLnk, targetObjectToOpen, iconFullPath);
-                    MakeGroups(shortcuts, action, altFullPathLnk);
+                    if (Helpers.CreateShortcutOutput(shortcuts, altFullPathLnk, targetObjectToOpen, iconFullPath))
+                        MakeGroups(shortcuts, action, altFullPathLnk);
                     //using (var urlStream = File.Open(altFullPathLnk, FileMode.Append))
                     //using (var urlWriter = new StreamWriter(urlStream))
                     //    urlWriter.WriteLine($"IconFile={iconFullPath}");
@@ -270,8 +278,8 @@ foreach (var action in Helpers.LogProgress(actionsList, a => a.FileName))
                 {
                     if (options.getFavIcon == true)
                         log.WriteLine($"Missing icon: {iconFullPath}");
-                    Helpers.CreateShortcut(altFullPathLnk, targetObjectToOpen);
-                    MakeGroups(shortcuts, action, altFullPathLnk);
+                    if (Helpers.CreateShortcutOutput(shortcuts, altFullPathLnk, targetObjectToOpen))
+                        MakeGroups(shortcuts, action, altFullPathLnk);
                 }
             }
             CreateInternetLink(action.FileName);
@@ -297,25 +305,29 @@ foreach (var action in Helpers.LogProgress(actionsList, a => a.FileName))
                 if (linTypes.Contains("lnk", StringComparer.OrdinalIgnoreCase))
                 {
                     var altFullPathLnk = Path.Combine(shortcuts, name) + ".lnk";
-                    Helpers.CreateShortcut(altFullPathLnk, targetObjectToOpen, workdir: workdir);
-                    MakeGroups(shortcuts, action, altFullPathLnk);
-                    if (elevated)
+                    var created = Helpers.CreateShortcutOutput(shortcuts, altFullPathLnk, targetObjectToOpen, workdir: workdir);
+                    if (created)
+                        MakeGroups(shortcuts, action, altFullPathLnk);
+                    if (created && elevated)
                         Helpers.MakeElevatedLink(altFullPathLnk);
                 }
                 if (linTypes.Contains("ps1", StringComparer.OrdinalIgnoreCase))
                 {
                     var altFullPathPs1 = Path.Combine(shortcuts, name) + ".ps1";
-                    Helpers.CreatePowerShellProxy(altFullPathPs1, targetObjectToOpen, elevated, workdir);
+                    if (!Helpers.WouldShadowExternalCommand(shortcuts, altFullPathPs1))
+                        Helpers.CreatePowerShellProxy(altFullPathPs1, targetObjectToOpen, elevated, workdir);
                 }
                 if (linTypes.Contains("cmd", StringComparer.OrdinalIgnoreCase))
                 {
                     var altFullPathCmd = Path.Combine(shortcuts, name) + ".cmd";
-                    Helpers.CreateCommandPromptProxy(altFullPathCmd, targetObjectToOpen, elevated, workdir);
+                    if (!Helpers.WouldShadowExternalCommand(shortcuts, altFullPathCmd))
+                        Helpers.CreateCommandPromptProxy(altFullPathCmd, targetObjectToOpen, elevated, workdir);
                 }
                 if (linTypes.Contains("sh", StringComparer.OrdinalIgnoreCase))
                 {
                     var altFullPathSh = Path.Combine(shortcuts, name) + ".sh";
-                    Helpers.CreateGitBashProxy(altFullPathSh, targetObjectToOpen, elevated, workdir);
+                    if (!Helpers.WouldShadowExternalCommand(shortcuts, altFullPathSh))
+                        Helpers.CreateGitBashProxy(altFullPathSh, targetObjectToOpen, elevated, workdir);
                 }
             }
             CreateLocalLink(action.FileName, false);
@@ -337,26 +349,26 @@ foreach (var action in Helpers.LogProgress(actionsList, a => a.FileName))
             void CreateDirLinks(string name)
             {
                 var altFullPathLnk = Path.Combine(shortcuts, name) + ".lnk";
-                Helpers.CreateShortcut(altFullPathLnk, targetObjectToOpen);
-                MakeGroups(shortcuts, action, altFullPathLnk);
+                if (Helpers.CreateShortcutOutput(shortcuts, altFullPathLnk, targetObjectToOpen))
+                    MakeGroups(shortcuts, action, altFullPathLnk);
 
                 var driveLetter = Path.GetPathRoot(targetObjectToOpen).Split(":")[0];
 
                 var altFullPathCmd = Path.Combine(shortcuts, name) + ".cmd";
-                File.WriteAllText(altFullPathCmd, $"""
+                Helpers.WriteShortcutOutput(shortcuts, altFullPathCmd, $"""
                     @echo off
                     cd "{targetObjectToOpen}"
                     {driveLetter}:
                     """);
 
                 var altFullPathPs1 = Path.Combine(shortcuts, name) + ".ps1";
-                File.WriteAllText(altFullPathPs1, $"""
+                Helpers.WriteShortcutOutput(shortcuts, altFullPathPs1, $"""
                     set-location "{targetObjectToOpen}"
                     """);
 
                 var altFullPathSh = Path.Combine(shortcuts, name) + ".sh";
                 var unixPath = "/" + string.Join("/", targetObjectToOpen.Split("\\").Skip(1));
-                File.WriteAllText(altFullPathSh, $$"""
+                Helpers.WriteShortcutOutput(shortcuts, altFullPathSh, $$"""
                     #!/usr/bin/env bash
                     function add_alias {
                         echo "Adding alias for $1 $2$3"
@@ -395,33 +407,37 @@ foreach (var action in Helpers.LogProgress(actionsList, a => a.FileName))
     {
         if (File.Exists(targetObjectToOpen) && Helpers.HasExt(targetObjectToOpen, ".lnk", ".url"))
         {
-            var fileNameExt = Path.GetFileName(targetObjectToOpen);
-            var targetFullPath = Path.Combine(shortcuts, fileNameExt);
-            Helpers.Copy(targetObjectToOpen, targetFullPath);
-            MakeGroups(shortcuts, action, targetFullPath);
-            action.FullPath = targetFullPath;
-
             var ext = Path.GetExtension(targetObjectToOpen);
+            var fileNameExt = action.FileName + ext;
+            var targetFullPath = Path.Combine(shortcuts, fileNameExt);
+            if (Helpers.CopyShortcutOutput(shortcuts, targetObjectToOpen, targetFullPath))
+            {
+                MakeGroups(shortcuts, action, targetFullPath);
+                action.FullPath = targetFullPath;
+            }
+
             foreach (var altname in action.Options.AltNames)
             {
                 var altFullPath = Path.Combine(shortcuts, altname + ext);
-                Helpers.Copy(targetObjectToOpen, altFullPath);
-                //MakeGroups(shortcuts, action, altFullPath);
+                if (Helpers.CopyShortcutOutput(shortcuts, targetObjectToOpen, altFullPath))
+                    MakeGroups(shortcuts, action, altFullPath);
             }
             if (Helpers.HasExt(targetObjectToOpen, ".lnk"))
             {
                 foreach (var altname in action.Options.ElevNames)
                 {
                     var altFullPath = Path.Combine(shortcuts, altname + ext);
-                    Helpers.Copy(targetObjectToOpen, altFullPath);
-                    Helpers.MakeElevatedLink(altFullPath);
+                    if (Helpers.CopyShortcutOutput(shortcuts, targetObjectToOpen, altFullPath))
+                        Helpers.MakeElevatedLink(altFullPath);
                 }
                 if (action.Options.ElevNames.Count > 0)
                 {
                     var toCreateElev = Path.Combine(shortcuts, action.FileName + " Elevated" + ext);
-                    Helpers.Copy(targetObjectToOpen, toCreateElev);
-                    Helpers.MakeElevatedLink(toCreateElev);
-                    MakeGroups(shortcuts, action, toCreateElev);
+                    if (Helpers.CopyShortcutOutput(shortcuts, targetObjectToOpen, toCreateElev))
+                    {
+                        Helpers.MakeElevatedLink(toCreateElev);
+                        MakeGroups(shortcuts, action, toCreateElev);
+                    }
                 }
             }
         }

@@ -19,3 +19,9 @@ For example, the link `"Visual Studio Code"` will be sent to the special
 shortcuts folder when found on the Desktop, but also new links will be created:
 `"code"` and `"coda"`. The first open VS Code normally,
 the second opens it with elevated privileges.
+
+## Design principles
+
+See [Move Shortcuts Design Principles](docs/design-principles.md) for the PATH
+safety rules, vendor shortcut behavior, alias policy, group folder behavior, and
+the intended Debug output/configuration location.

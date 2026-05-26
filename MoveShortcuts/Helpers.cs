@@ -28,6 +28,94 @@ namespace MoveShortcuts
             File.SetCreationTimeUtc(target, sourceDate);
         }
 
+        public static bool WouldShadowExternalCommand(string shortcutsRoot, string outputPath)
+            => WouldShadowExternalCommand(
+                shortcutsRoot,
+                outputPath,
+                Environment.GetEnvironmentVariable("PATH") ?? "",
+                Environment.GetEnvironmentVariable("PATHEXT") ?? "");
+
+        public static bool WouldShadowExternalCommand(
+            string shortcutsRoot,
+            string outputPath,
+            string pathValue,
+            string pathExtValue)
+        {
+            var commandName = Path.GetFileNameWithoutExtension(outputPath);
+            if (string.IsNullOrWhiteSpace(commandName))
+                return false;
+
+            var pathEntries = pathValue
+                .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            var pathext = pathExtValue
+                .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Concat(new[] { ".exe", ".com", ".bat", ".cmd", ".ps1", ".lnk", ".url" })
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            var candidates = new List<string> { commandName };
+            candidates.AddRange(pathext.Select(ext => commandName + ext));
+
+            foreach (var dir in pathEntries)
+            {
+                foreach (var candidate in candidates)
+                {
+                    var path = Path.Combine(dir, candidate);
+                    if (!File.Exists(path))
+                        continue;
+
+                    var fullPath = Path.GetFullPath(path);
+                    if (!IsPathInside(shortcutsRoot, fullPath))
+                        return true;
+                }
+            }
+
+            return false;
+        }
+
+        public static bool IsPathInside(string root, string path)
+        {
+            var fullRoot = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                + Path.DirectorySeparatorChar;
+            var fullPath = Path.GetFullPath(path);
+            return fullPath.StartsWith(fullRoot, StringComparison.OrdinalIgnoreCase);
+        }
+
+        public static bool CopyShortcutOutput(string shortcutsRoot, string source, string target)
+        {
+            if (WouldShadowExternalCommand(shortcutsRoot, target))
+            {
+                Console.WriteLine($"Skipping {Path.GetFileName(target)}: command exists outside {shortcutsRoot}");
+                return false;
+            }
+
+            Copy(source, target);
+            return true;
+        }
+
+        public static bool WriteShortcutOutput(string shortcutsRoot, string target, string contents)
+        {
+            if (WouldShadowExternalCommand(shortcutsRoot, target))
+            {
+                Console.WriteLine($"Skipping {Path.GetFileName(target)}: command exists outside {shortcutsRoot}");
+                return false;
+            }
+
+            File.WriteAllText(target, contents);
+            return true;
+        }
+
+        public static bool CreateShortcutOutput(string shortcutsRoot, string linkfile, string target, string icon = null, string workdir = null)
+        {
+            if (WouldShadowExternalCommand(shortcutsRoot, linkfile))
+            {
+                Console.WriteLine($"Skipping {Path.GetFileName(linkfile)}: command exists outside {shortcutsRoot}");
+                return false;
+            }
+
+            return CreateShortcut(linkfile, target, icon, workdir);
+        }
+
         public static bool HasExt(string filename, params string[] extensions)
         {
             bool result = extensions.Contains(
@@ -172,7 +260,9 @@ namespace MoveShortcuts
                 {
                     var fullPath = Path.Combine(shortcutsFolder, name + ".lnk");
                     Directory.CreateDirectory(shortcutsFolder);
-                    Helpers.CreateShortcut(
+                    var shortcutsRoot = Directory.GetParent(shortcutsFolder)?.FullName ?? shortcutsFolder;
+                    Helpers.CreateShortcutOutput(
+                        shortcutsRoot,
                         fullPath,
                         @$"shell:AppsFolder\{appUserModelID}"
                         );
@@ -228,6 +318,8 @@ namespace MoveShortcuts
                     {
                         // Read the first line of output
                         string output = reader.ReadLine();
+                        if (!process.HasExited)
+                            process.Kill(entireProcessTree: true);
                         return output; // Returns the first line or null if no output
                     }
                 }
