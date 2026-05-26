@@ -31,11 +31,12 @@ the intended Debug output/configuration location.
 Progress can be controlled from the command line:
 
 ```text
+MoveShortcuts --help
 MoveShortcuts --progress quiet
 MoveShortcuts --progress log
 MoveShortcuts --progress cli
 ```
 
-`--quiet`, `--log`, and `--cli` are shortcuts for those modes. The default is
-automatic: compact CLI progress in a terminal, and log-style progress when
-output is redirected.
+`-h`, `-help`, `--help`, and `/?` show usage. `--quiet`, `--log`, and `--cli`
+are shortcuts for those progress modes. The default is automatic: compact CLI
+progress in a terminal, and log-style progress when output is redirected.

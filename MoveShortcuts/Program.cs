@@ -9,6 +9,12 @@ using System.Security.Policy;
 using System.Text.RegularExpressions;
 using static System.Net.Mime.MediaTypeNames;
 
+if (IsHelpRequested(args))
+{
+    PrintHelp();
+    return;
+}
+
 var log = new StreamWriter(File.Open("move-shortcuts.log", FileMode.Append));
 
 var options = new Settings();
@@ -506,4 +512,46 @@ static string? GetProgressOverride(string[] args)
     }
 
     return null;
+}
+
+static bool IsHelpRequested(string[] args)
+{
+    return args.Any(arg =>
+        arg.Equals("-h", StringComparison.OrdinalIgnoreCase) ||
+        arg.Equals("--help", StringComparison.OrdinalIgnoreCase) ||
+        arg.Equals("-help", StringComparison.OrdinalIgnoreCase) ||
+        arg.Equals("/?", StringComparison.OrdinalIgnoreCase));
+}
+
+static void PrintHelp()
+{
+    Console.WriteLine("""
+        MoveShortcuts
+
+        Usage:
+          MoveShortcuts [options]
+
+        Options:
+          -h, -help, --help, /?
+              Show this help text and exit.
+
+          --progress <mode>
+              Select progress output. Modes: quiet, log, cli.
+
+          --quiet
+              Hide progress counters.
+
+          --log
+              Print each progress item on its own line.
+
+          --cli
+              Use compact single-line terminal progress.
+
+        Configuration:
+          Reads move-shortcuts-options.json from the current working directory.
+          The config file can also set "progress": "auto", "quiet", "log", or "cli".
+
+        Default progress:
+          auto: cli in an interactive terminal, log when output is redirected.
+        """);
 }
