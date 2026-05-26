@@ -98,6 +98,14 @@ If you're curious about the internal decisions behind how this works, see:
 
 [Design Principles](docs/design-principles.md)
 
+It covers things like:
+
+- PATH safety rules  
+- Vendor shortcut handling  
+- Alias generation rules  
+- Folder grouping behavior  
+- Debug and config locations
+
 For details on the UWP cache design, see:
 
 [UWP Cache Design](docs/uwp-cache-design.md)
@@ -109,14 +117,6 @@ There is also a short performance notebook:
 The project has a small `research/` folder documenting the UWP/AppModel
 investigation behind the cache. It is not required to use the tool, but it shows
 the kind of care taken around Windows-specific behavior and performance.
-
-It covers things like:
-
-- PATH safety rules  
-- Vendor shortcut handling  
-- Alias generation rules  
-- Folder grouping behavior  
-- Debug and config locations
 
 ## Closing note
 
