@@ -29,6 +29,7 @@ namespace MoveShortcuts
         private static ProgressMode _progressMode = Console.IsOutputRedirected ? ProgressMode.Log : ProgressMode.Cli;
         private static bool _progressLineActive;
         private static int _progressLineWidth;
+        private static readonly Dictionary<CommandPathIndexKey, CommandPathIndex> _commandPathIndexes = new();
 
         public static string ToString<T>(T o) => $"{o}";
 
@@ -99,31 +100,128 @@ namespace MoveShortcuts
             if (string.IsNullOrWhiteSpace(commandName))
                 return null;
 
-            var pathEntries = pathValue
-                .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-            var pathext = pathExtValue
-                .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .Concat(new[] { ".exe", ".com", ".bat", ".cmd", ".ps1", ".lnk", ".url" })
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToList();
-
-            var candidates = new List<string> { commandName };
-            candidates.AddRange(pathext.Select(ext => commandName + ext));
-
-            foreach (var dir in pathEntries)
+            var index = GetCommandPathIndex(pathValue, pathExtValue);
+            foreach (var entry in index.Entries)
             {
-                foreach (var candidate in candidates)
+                if (string.IsNullOrEmpty(entry.Directory))
+                    continue;
+
+                foreach (var candidate in index.GetCandidates(commandName))
                 {
-                    var path = Path.Combine(dir, candidate);
-                    if (!File.Exists(path))
+                    var candidatePath = Path.Combine(entry.Directory, candidate);
+                    if (IsPathInside(shortcutsRoot, candidatePath) && File.Exists(candidatePath))
+                        return null;
+
+                    if (!entry.Files.TryGetValue(candidate, out var fullPath))
                         continue;
 
-                    var fullPath = Path.GetFullPath(path);
                     return IsPathInside(shortcutsRoot, fullPath) ? null : fullPath;
                 }
             }
 
             return null;
+        }
+
+        private static CommandPathIndex GetCommandPathIndex(string pathValue, string pathExtValue)
+        {
+            var key = new CommandPathIndexKey(pathValue, pathExtValue);
+            lock (_commandPathIndexes)
+            {
+                if (!_commandPathIndexes.TryGetValue(key, out var index))
+                {
+                    index = CommandPathIndex.Create(pathValue, pathExtValue);
+                    _commandPathIndexes[key] = index;
+                }
+
+                return index;
+            }
+        }
+
+        private sealed record CommandPathIndexKey(string PathValue, string PathExtValue);
+
+        private sealed class CommandPathIndex
+        {
+            private readonly Dictionary<string, IReadOnlyList<string>> _candidateCache = new(StringComparer.OrdinalIgnoreCase);
+
+            private CommandPathIndex(IReadOnlyList<CommandPathEntry> entries, IReadOnlyList<string> pathExtensions)
+            {
+                Entries = entries;
+                PathExtensions = pathExtensions;
+            }
+
+            public IReadOnlyList<CommandPathEntry> Entries { get; }
+
+            public IReadOnlyList<string> PathExtensions { get; }
+
+            public static CommandPathIndex Create(string pathValue, string pathExtValue)
+            {
+                var pathExtensions = pathExtValue
+                    .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .Concat(new[] { ".exe", ".com", ".bat", ".cmd", ".ps1", ".lnk", ".url" })
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                var entries = pathValue
+                    .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .Select(CommandPathEntry.Create)
+                    .ToList();
+
+                return new CommandPathIndex(entries, pathExtensions);
+            }
+
+            public IReadOnlyList<string> GetCandidates(string commandName)
+            {
+                if (_candidateCache.TryGetValue(commandName, out var candidates))
+                    return candidates;
+
+                candidates = new[] { commandName }
+                    .Concat(PathExtensions.Select(ext => commandName + ext))
+                    .ToList();
+                _candidateCache[commandName] = candidates;
+                return candidates;
+            }
+        }
+
+        private sealed class CommandPathEntry
+        {
+            private CommandPathEntry(Dictionary<string, string> files)
+            {
+                Files = files;
+            }
+
+            public string Directory { get; private init; } = "";
+
+            public Dictionary<string, string> Files { get; }
+
+            public static CommandPathEntry Create(string directory)
+            {
+                var files = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                var fullDirectory = "";
+                try
+                {
+                    fullDirectory = Path.GetFullPath(directory);
+                    foreach (var file in System.IO.Directory.EnumerateFiles(fullDirectory))
+                    {
+                        var filename = Path.GetFileName(file);
+                        if (!files.ContainsKey(filename))
+                            files[filename] = Path.GetFullPath(file);
+                    }
+                }
+                catch (UnauthorizedAccessException)
+                {
+                }
+                catch (IOException)
+                {
+                }
+                catch (ArgumentException)
+                {
+                }
+                catch (NotSupportedException)
+                {
+                }
+
+                return new CommandPathEntry(files) { Directory = fullDirectory };
+            }
         }
 
         public static bool IsPathInside(string root, string path)

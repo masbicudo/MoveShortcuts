@@ -90,6 +90,29 @@ namespace MoveShortcutTests
         }
 
         [TestMethod]
+        public void WouldShadowExternalCommand_SeesShortcutCreatedAfterPathIndexWasCached()
+        {
+            File.WriteAllText(Path.Combine(_externalBin, "ollama.exe"), "");
+            var pathValue = string.Join(Path.PathSeparator, _shortcuts, _externalBin);
+            var outputPath = Path.Combine(_shortcuts, "ollama.lnk");
+
+            var shadowsBeforeShortcutExists = Helpers.WouldShadowExternalCommand(
+                _shortcuts,
+                outputPath,
+                pathValue,
+                ".EXE;.LNK");
+            File.WriteAllText(outputPath, "");
+            var shadowsAfterShortcutExists = Helpers.WouldShadowExternalCommand(
+                _shortcuts,
+                Path.Combine(_shortcuts, "ollama.ps1"),
+                pathValue,
+                ".EXE;.LNK");
+
+            Assert.IsTrue(shadowsBeforeShortcutExists);
+            Assert.IsFalse(shadowsAfterShortcutExists);
+        }
+
+        [TestMethod]
         public void WouldShadowExternalCommand_ReturnsFalse_ForNonConflictingAlias()
         {
             File.WriteAllText(Path.Combine(_externalBin, "ollama.exe"), "");
