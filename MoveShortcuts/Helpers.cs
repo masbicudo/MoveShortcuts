@@ -421,6 +421,9 @@ namespace MoveShortcuts
 
         public static bool CreateShortcut(string linkfile, string target, string icon = null, string workdir = null)
         {
+            if (icon == null && workdir == null && ShortcutBinaryInspector.ContainsTargetHint(linkfile, target))
+                return true;
+
             dynamic shell = _shortcutShell.Value;
             try
             {
