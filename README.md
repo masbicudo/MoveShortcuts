@@ -28,6 +28,17 @@ the intended Debug output/configuration location.
 
 ## Progress output
 
+Create a starter configuration with:
+
+```text
+MoveShortcuts init
+```
+
+`init` asks which sources to scan, whether to generate initial-based aliases,
+and whether desktop shortcuts should be removed after managed shortcuts are
+created. It only writes `move-shortcuts-options.json`; you can review that file
+before running MoveShortcuts for real.
+
 Progress can be controlled from the command line:
 
 ```text

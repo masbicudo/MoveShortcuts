@@ -15,23 +15,28 @@ if (IsHelpRequested(args))
     return;
 }
 
-var log = new StreamWriter(File.Open("move-shortcuts.log", FileMode.Append));
+var progressOverride = GetProgressOverride(args);
+var optsFileName = "move-shortcuts-options.json";
+
+if (IsInitRequested(args))
+{
+    RunInit(optsFileName, progressOverride);
+    return;
+}
 
 var options = new Settings();
-var progressOverride = GetProgressOverride(args);
-
-var optsFileName = "move-shortcuts-options.json";
 var foundOptionsFile = File.Exists(optsFileName);
 if (foundOptionsFile)
 {
     var json = File.ReadAllText(optsFileName);
     options = JsonConvert.DeserializeObject<Settings>(json) ?? new Settings();
+    InitOptionsBuilder.NormalizeSettings(options);
 }
 else
 {
-    options.fileOptions = Settings.defaultFileOptions;
-    var json = JsonConvert.SerializeObject(options, Formatting.Indented);
-    File.WriteAllText(optsFileName, json);
+    Console.WriteLine("No data file found: " + optsFileName);
+    Console.WriteLine("Run MoveShortcuts init to create one.");
+    return;
 }
 
 Helpers.SetProgressMode(Helpers.ResolveProgressMode(progressOverride ?? options.progress));
@@ -39,7 +44,10 @@ Helpers.WriteLine("Workdir: " + Directory.GetCurrentDirectory());
 Helpers.WriteLine("Executable: " + System.Reflection.Assembly.GetExecutingAssembly().Location);
 Helpers.WriteLine((foundOptionsFile ? "Found" : "New") + " data file: " + optsFileName);
 
+var log = new StreamWriter(File.Open("move-shortcuts.log", FileMode.Append));
+
 var fileOptions = options.fileOptions;
+InitOptionsBuilder.ApplyGlobalCleanupSetting(options);
 var shortcuts = options.shortcuts;
 
 // ensuring shortcuts directory is there
@@ -70,10 +78,13 @@ List<string> allSourceFiles = new();
 // Creating shortcuts for all UWP programs that appear in the
 // listing inside the configurations file. These will be created
 // in a subfolder of the shortcuts folder
-Helpers.WriteLine("Creating shortcuts for UWP programs:");
-var uwpApps = Helpers.GetUwpApps();
 var uwpShortcutsFolder = Path.Combine(shortcuts, "UWP Apps");
-Helpers.CreateUWPShortcuts(uwpShortcutsFolder, fileOptions, uwpApps);
+if (options.sources.uwpApps)
+{
+    Helpers.WriteLine("Creating shortcuts for UWP programs:");
+    var uwpApps = Helpers.GetUwpApps();
+    Helpers.CreateUWPShortcuts(uwpShortcutsFolder, fileOptions, uwpApps);
+}
 
 Helpers.WriteLine("Collecting items locations");
 {
@@ -89,25 +100,34 @@ Helpers.WriteLine("Collecting items locations");
     // lesser versions associated commands.
     var revFileNameComparer = Helpers.ReverseComparer<string>(FileNameComparer.Default.Compare);
 
-    var allDesktopFiles = Directory.GetFiles(desktopPath, "*.*", dirEnumOpts).ToList();
-    allDesktopFiles.Sort(revFileNameComparer);
-    allSourceFiles.AddRange(allDesktopFiles);
+    if (options.sources.desktop)
+    {
+        var allDesktopFiles = Directory.GetFiles(desktopPath, "*.*", dirEnumOpts).ToList();
+        allDesktopFiles.Sort(revFileNameComparer);
+        allSourceFiles.AddRange(allDesktopFiles);
 
-    var allDesktopFiles2 = Directory.GetFiles(desktopPath2, "*.*", dirEnumOpts).ToList();
-    allDesktopFiles2.Sort(revFileNameComparer);
-    allSourceFiles.AddRange(allDesktopFiles2);
+        var allDesktopFiles2 = Directory.GetFiles(desktopPath2, "*.*", dirEnumOpts).ToList();
+        allDesktopFiles2.Sort(revFileNameComparer);
+        allSourceFiles.AddRange(allDesktopFiles2);
+    }
 
-    var allStartMenuFiles = Directory.GetFiles(startMenuPath, "*.*", dirEnumOptsRecursive).ToList();
-    allStartMenuFiles.Sort(revFileNameComparer);
-    allSourceFiles.AddRange(allStartMenuFiles);
+    if (options.sources.startMenu)
+    {
+        var allStartMenuFiles = Directory.GetFiles(startMenuPath, "*.*", dirEnumOptsRecursive).ToList();
+        allStartMenuFiles.Sort(revFileNameComparer);
+        allSourceFiles.AddRange(allStartMenuFiles);
 
-    var allStartMenuFiles2 = Directory.GetFiles(startMenuPath2, "*.*", dirEnumOptsRecursive).ToList();
-    allStartMenuFiles2.Sort(revFileNameComparer);
-    allSourceFiles.AddRange(allStartMenuFiles2);
+        var allStartMenuFiles2 = Directory.GetFiles(startMenuPath2, "*.*", dirEnumOptsRecursive).ToList();
+        allStartMenuFiles2.Sort(revFileNameComparer);
+        allSourceFiles.AddRange(allStartMenuFiles2);
+    }
 
-    var allUwpApps = Directory.GetFiles(uwpShortcutsFolder, "*.*", dirEnumOptsRecursive).ToList();
-    allUwpApps.Sort(revFileNameComparer);
-    allSourceFiles.AddRange(allUwpApps);
+    if (options.sources.uwpApps && Directory.Exists(uwpShortcutsFolder))
+    {
+        var allUwpApps = Directory.GetFiles(uwpShortcutsFolder, "*.*", dirEnumOptsRecursive).ToList();
+        allUwpApps.Sort(revFileNameComparer);
+        allSourceFiles.AddRange(allUwpApps);
+    }
 
 }
 Helpers.WriteLine($"  Found {allSourceFiles.Count} items");
@@ -523,6 +543,242 @@ static bool IsHelpRequested(string[] args)
         arg.Equals("/?", StringComparison.OrdinalIgnoreCase));
 }
 
+static bool IsInitRequested(string[] args)
+{
+    return args.Any(arg => arg.Equals("init", StringComparison.OrdinalIgnoreCase));
+}
+
+static void RunInit(string optsFileName, string? progressOverride)
+{
+    Helpers.SetProgressMode(Helpers.ResolveProgressMode(progressOverride ?? "log"));
+
+    var outputPath = Path.GetFullPath(optsFileName);
+    Helpers.WriteLine("MoveShortcuts init");
+    Helpers.WriteLine("");
+
+    var options = new Settings
+    {
+        shortcuts = AskString("Shortcut directory", @"C:\Shortcuts"),
+        progress = "auto",
+        sources = new SourceSettings
+        {
+            desktop = AskYesNo("Scan Desktop shortcuts?", defaultValue: true),
+            startMenu = AskYesNo("Scan Start Menu shortcuts?", defaultValue: true),
+            uwpApps = AskYesNo("Scan UWP / AppsFolder programs?", defaultValue: true),
+        },
+        cleanup = new CleanupSettings(),
+        aliases = new AliasSettings(),
+        fileOptions = new Dictionary<string, MyFileOptions>(),
+    };
+
+    options.cleanup.deleteDesktopShortcuts = options.sources.desktop
+        && AskYesNo(
+            "MoveShortcuts can unclutter your desktop from installer icons. Remove matching desktop shortcuts after managed shortcuts are created?",
+            defaultValue: false);
+
+    options.aliases.generateInitials = AskYesNo(
+        "Generate short aliases from words and capital letters? Examples: Visual Studio Code -> vsc, FireFox -> ff.",
+        defaultValue: true);
+
+    if (options.aliases.generateInitials)
+        options.aliases.minimumLength = AskInt("Minimum generated alias length", defaultValue: 2, minimum: 1);
+
+    Helpers.WriteLine("");
+    Helpers.WriteLine("Scanning selected sources...");
+    var initScan = ScanForInit(options);
+    options.fileOptions = initScan.FileOptions;
+
+    Helpers.WriteLine("");
+    Helpers.WriteLine("Your choices will affect:");
+    if (options.sources.desktop)
+    {
+        var operation = options.cleanup.deleteDesktopShortcuts ? "moved to" : "copied to";
+        Helpers.WriteLine($"- {initScan.DesktopShortcutCount} desktop icons, and they will be {operation} the Shortcuts folder");
+    }
+    else
+    {
+        Helpers.WriteLine("- 0 desktop icons; Desktop scanning is disabled");
+    }
+
+    Helpers.WriteLine(options.sources.startMenu
+        ? $"- {initScan.StartMenuShortcutCount} start menu icons will be copied"
+        : "- 0 start menu icons; Start Menu scanning is disabled");
+
+    Helpers.WriteLine(options.sources.uwpApps
+        ? $"- {initScan.UwpProgramCount} UWP programs will have shortcuts added"
+        : "- 0 UWP programs; UWP scanning is disabled");
+
+    if (options.aliases.generateInitials)
+    {
+        Helpers.WriteLine($"- {initScan.GeneratedAliasCount} generated aliases will be added");
+        if (initScan.SkippedAliasCount > 0)
+            Helpers.WriteLine($"- {initScan.SkippedAliasCount} generated aliases were skipped because they conflict with existing commands or aliases");
+    }
+
+    Helpers.WriteLine("");
+    Helpers.WriteLine($"This will just create the options file at {outputPath}");
+    Helpers.WriteLine("You can revise it before doing anything for real.");
+    if (File.Exists(outputPath))
+        Helpers.WriteLine("The file already exists and will be overwritten if you proceed.");
+
+    if (!AskYesNo("Would you like to proceed?", defaultValue: false))
+    {
+        Helpers.WriteLine("Init cancelled. No files were changed.");
+        return;
+    }
+
+    var json = JsonConvert.SerializeObject(options, Formatting.Indented);
+    File.WriteAllText(outputPath, json);
+    Helpers.WriteLine($"Created options file: {outputPath}");
+}
+
+static InitScanResult ScanForInit(Settings options)
+{
+    var dirEnumOptsRecursive = new EnumerationOptions
+    {
+        IgnoreInaccessible = true,
+        RecurseSubdirectories = true,
+    };
+    var dirEnumOpts = new EnumerationOptions
+    {
+        IgnoreInaccessible = true,
+    };
+    var shortcuts = options.shortcuts;
+    var entries = new Dictionary<string, InitSourceEntry>(StringComparer.OrdinalIgnoreCase);
+    var desktopCount = 0;
+    var startMenuCount = 0;
+    var uwpCount = 0;
+
+    if (options.sources.desktop)
+    {
+        var desktopFiles = GetFilesIfDirectoryExists(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "*.*", dirEnumOpts)
+            .Concat(GetFilesIfDirectoryExists(Environment.GetFolderPath(Environment.SpecialFolder.CommonDesktopDirectory), "*.*", dirEnumOpts))
+            .Where(IsShortcutLike)
+            .ToList();
+        desktopCount = desktopFiles.Count;
+        foreach (var file in desktopFiles)
+            AddInitEntry(entries, file, SourceKind.Desktop);
+    }
+
+    if (options.sources.startMenu)
+    {
+        var startMenuFiles = GetFilesIfDirectoryExists(Environment.GetFolderPath(Environment.SpecialFolder.StartMenu), "*.*", dirEnumOptsRecursive)
+            .Concat(GetFilesIfDirectoryExists(Environment.GetFolderPath(Environment.SpecialFolder.CommonStartMenu), "*.*", dirEnumOptsRecursive))
+            .Where(IsShortcutLike)
+            .ToList();
+        startMenuCount = startMenuFiles.Count;
+        foreach (var file in startMenuFiles)
+            AddInitEntry(entries, file, SourceKind.StartMenu);
+    }
+
+    if (options.sources.uwpApps)
+    {
+        var uwpApps = Helpers.GetUwpApps();
+        uwpCount = uwpApps.Count;
+        foreach (var name in uwpApps.Keys)
+            AddInitEntry(entries, name, SourceKind.Uwp);
+    }
+
+    var aliasSet = new HashSet<string>(entries.Keys, StringComparer.OrdinalIgnoreCase);
+    var generatedAliasCount = 0;
+    var skippedAliasCount = 0;
+    foreach (var entry in entries.Values)
+    {
+        var option = InitOptionsBuilder.CreateFileOptions(options.cleanup.deleteDesktopShortcuts);
+        if (options.aliases.generateInitials)
+        {
+            var aliasResult = InitOptionsBuilder.TryAddInitialsAlias(
+                option,
+                entry.Name,
+                aliasSet,
+                shortcuts,
+                options.aliases.minimumLength);
+            if (aliasResult.Status == InitAliasStatus.Added)
+            {
+                generatedAliasCount++;
+            }
+            else if (aliasResult.Status == InitAliasStatus.Skipped)
+            {
+                skippedAliasCount++;
+            }
+        }
+
+        entry.FileOptions = option;
+    }
+
+    return new InitScanResult(
+        entries.ToDictionary(kv => kv.Key, kv => kv.Value.FileOptions, StringComparer.OrdinalIgnoreCase),
+        desktopCount,
+        startMenuCount,
+        uwpCount,
+        generatedAliasCount,
+        skippedAliasCount);
+}
+
+static IEnumerable<string> GetFilesIfDirectoryExists(string directory, string searchPattern, EnumerationOptions options)
+{
+    if (string.IsNullOrWhiteSpace(directory) || !Directory.Exists(directory))
+        return Enumerable.Empty<string>();
+
+    return Directory.GetFiles(directory, searchPattern, options);
+}
+
+static bool IsShortcutLike(string path)
+{
+    return Helpers.HasExt(path, ".lnk", ".url");
+}
+
+static void AddInitEntry(Dictionary<string, InitSourceEntry> entries, string fileOrName, SourceKind sourceKind)
+{
+    var name = sourceKind == SourceKind.Uwp
+        ? fileOrName
+        : Path.GetFileNameWithoutExtension(fileOrName);
+
+    if (string.IsNullOrWhiteSpace(name))
+        return;
+
+    if (!entries.ContainsKey(name))
+        entries[name] = new InitSourceEntry(name, sourceKind);
+}
+
+static bool AskYesNo(string question, bool defaultValue)
+{
+    var suffix = defaultValue ? " [Y/n] " : " [y/N] ";
+    while (true)
+    {
+        Console.Write(question + suffix);
+        var answer = Console.ReadLine()?.Trim();
+        if (string.IsNullOrWhiteSpace(answer))
+            return defaultValue;
+        if (answer.Equals("y", StringComparison.OrdinalIgnoreCase) || answer.Equals("yes", StringComparison.OrdinalIgnoreCase))
+            return true;
+        if (answer.Equals("n", StringComparison.OrdinalIgnoreCase) || answer.Equals("no", StringComparison.OrdinalIgnoreCase))
+            return false;
+        Console.WriteLine("Please answer yes or no.");
+    }
+}
+
+static string AskString(string question, string defaultValue)
+{
+    Console.Write($"{question} [{defaultValue}] ");
+    var answer = Console.ReadLine()?.Trim();
+    return string.IsNullOrWhiteSpace(answer) ? defaultValue : answer;
+}
+
+static int AskInt(string question, int defaultValue, int minimum)
+{
+    while (true)
+    {
+        Console.Write($"{question} [{defaultValue}] ");
+        var answer = Console.ReadLine()?.Trim();
+        if (string.IsNullOrWhiteSpace(answer))
+            return defaultValue;
+        if (int.TryParse(answer, out var value) && value >= minimum)
+            return value;
+        Console.WriteLine($"Please enter a number greater than or equal to {minimum}.");
+    }
+}
+
 static void PrintHelp()
 {
     Console.WriteLine("""
@@ -530,6 +786,7 @@ static void PrintHelp()
 
         Usage:
           MoveShortcuts [options]
+          MoveShortcuts init [options]
 
         Options:
           -h, -help, --help, /?
@@ -551,7 +808,40 @@ static void PrintHelp()
           Reads move-shortcuts-options.json from the current working directory.
           The config file can also set "progress": "auto", "quiet", "log", or "cli".
 
+        Commands:
+          init
+              Ask a few questions, scan selected sources, estimate the effect,
+              and create move-shortcuts-options.json without creating shortcuts.
+
         Default progress:
           auto: cli in an interactive terminal, log when output is redirected.
         """);
+}
+
+record InitScanResult(
+    Dictionary<string, MyFileOptions> FileOptions,
+    int DesktopShortcutCount,
+    int StartMenuShortcutCount,
+    int UwpProgramCount,
+    int GeneratedAliasCount,
+    int SkippedAliasCount);
+
+class InitSourceEntry
+{
+    public InitSourceEntry(string name, SourceKind sourceKind)
+    {
+        Name = name;
+        SourceKind = sourceKind;
+    }
+
+    public string Name { get; }
+    public SourceKind SourceKind { get; }
+    public MyFileOptions FileOptions { get; set; } = new();
+}
+
+enum SourceKind
+{
+    Desktop,
+    StartMenu,
+    Uwp
 }

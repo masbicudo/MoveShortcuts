@@ -8,6 +8,12 @@
 
         public string? progress = "auto";
 
+        public SourceSettings sources = new();
+
+        public CleanupSettings cleanup = new();
+
+        public AliasSettings aliases = new();
+
         public Dictionary<string, MyFileOptions> fileOptions = new();
 
         public static Dictionary<string, MyFileOptions> defaultFileOptions = new()
@@ -76,5 +82,23 @@
                 AltNames = { "whats", "whaz", "whazap", "whapp", "wzap", "zap", "zapzap", "zz", "wa" },
             } },
         };
+    }
+
+    public class SourceSettings
+    {
+        public bool desktop = true;
+        public bool startMenu = true;
+        public bool uwpApps = true;
+    }
+
+    public class CleanupSettings
+    {
+        public bool deleteDesktopShortcuts = false;
+    }
+
+    public class AliasSettings
+    {
+        public bool generateInitials = false;
+        public int minimumLength = 2;
     }
 }
