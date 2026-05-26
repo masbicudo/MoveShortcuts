@@ -9,27 +9,29 @@ using System.Security.Policy;
 using System.Text.RegularExpressions;
 using static System.Net.Mime.MediaTypeNames;
 
-Console.WriteLine("Workdir: " + Directory.GetCurrentDirectory());
-Console.WriteLine("Executable: " + System.Reflection.Assembly.GetExecutingAssembly().Location);
-
 var log = new StreamWriter(File.Open("move-shortcuts.log", FileMode.Append));
 
 var options = new Settings();
+var progressOverride = GetProgressOverride(args);
 
 var optsFileName = "move-shortcuts-options.json";
-if (File.Exists(optsFileName))
+var foundOptionsFile = File.Exists(optsFileName);
+if (foundOptionsFile)
 {
-    Console.WriteLine("Found data file: " + optsFileName);
     var json = File.ReadAllText(optsFileName);
-    options = JsonConvert.DeserializeObject<Settings>(json);
+    options = JsonConvert.DeserializeObject<Settings>(json) ?? new Settings();
 }
 else
 {
-    Console.WriteLine("New data file: " + optsFileName);
     options.fileOptions = Settings.defaultFileOptions;
     var json = JsonConvert.SerializeObject(options, Formatting.Indented);
     File.WriteAllText(optsFileName, json);
 }
+
+Helpers.SetProgressMode(Helpers.ResolveProgressMode(progressOverride ?? options.progress));
+Helpers.WriteLine("Workdir: " + Directory.GetCurrentDirectory());
+Helpers.WriteLine("Executable: " + System.Reflection.Assembly.GetExecutingAssembly().Location);
+Helpers.WriteLine((foundOptionsFile ? "Found" : "New") + " data file: " + optsFileName);
 
 var fileOptions = options.fileOptions;
 var shortcuts = options.shortcuts;
@@ -62,12 +64,12 @@ List<string> allSourceFiles = new();
 // Creating shortcuts for all UWP programs that appear in the
 // listing inside the configurations file. These will be created
 // in a subfolder of the shortcuts folder
-Console.WriteLine("Creating shortcuts for UWP programs:");
+Helpers.WriteLine("Creating shortcuts for UWP programs:");
 var uwpApps = Helpers.GetUwpApps();
 var uwpShortcutsFolder = Path.Combine(shortcuts, "UWP Apps");
 Helpers.CreateUWPShortcuts(uwpShortcutsFolder, fileOptions, uwpApps);
 
-Console.WriteLine("Collecting items locations");
+Helpers.WriteLine("Collecting items locations");
 {
     //      We use a reverse filename comparer so that the
     // files with greatest versions comes first and we end up
@@ -102,12 +104,12 @@ Console.WriteLine("Collecting items locations");
     allSourceFiles.AddRange(allUwpApps);
 
 }
-Console.WriteLine($"  Found {allSourceFiles.Count} items");
+Helpers.WriteLine($"  Found {allSourceFiles.Count} items");
 
 //
 // Second step: matching collected files with items from the settings
 //
-Console.WriteLine("Collecting files to process:");
+Helpers.WriteLine("Collecting files to process:");
 HashSet<string> usedFilesNames = new();
 List<MyFileAction> actionsList = new();
 
@@ -219,7 +221,7 @@ actionsList.Sort(
 //
 // Third step: 
 //
-Console.WriteLine("Processing files:");
+Helpers.WriteLine("Processing files:");
 foreach (var action in Helpers.LogProgress(actionsList, a => a.FileName))
 {
     if (action.IsNotReady)
@@ -480,4 +482,28 @@ static void MakeGroups(string shortcuts, MyFileAction action, string altFullPath
         Directory.CreateDirectory(Path.Combine(shortcuts, grp));
         Helpers.Copy(altFullPathLnk, copyTo);
     }
+}
+
+static string? GetProgressOverride(string[] args)
+{
+    for (var i = 0; i < args.Length; i++)
+    {
+        var arg = args[i];
+        if (arg.Equals("--quiet", StringComparison.OrdinalIgnoreCase))
+            return "quiet";
+        if (arg.Equals("--log", StringComparison.OrdinalIgnoreCase))
+            return "log";
+        if (arg.Equals("--cli", StringComparison.OrdinalIgnoreCase))
+            return "cli";
+        if (arg.Equals("--progress", StringComparison.OrdinalIgnoreCase))
+        {
+            if (i + 1 >= args.Length)
+                throw new ArgumentException("--progress requires quiet, log, or cli.");
+            return args[++i];
+        }
+        if (arg.StartsWith("--progress=", StringComparison.OrdinalIgnoreCase))
+            return arg.Substring("--progress=".Length);
+    }
+
+    return null;
 }

@@ -25,3 +25,17 @@ the second opens it with elevated privileges.
 See [Move Shortcuts Design Principles](docs/design-principles.md) for the PATH
 safety rules, vendor shortcut behavior, alias policy, group folder behavior, and
 the intended Debug output/configuration location.
+
+## Progress output
+
+Progress can be controlled from the command line:
+
+```text
+MoveShortcuts --progress quiet
+MoveShortcuts --progress log
+MoveShortcuts --progress cli
+```
+
+`--quiet`, `--log`, and `--cli` are shortcuts for those modes. The default is
+automatic: compact CLI progress in a terminal, and log-style progress when
+output is redirected.

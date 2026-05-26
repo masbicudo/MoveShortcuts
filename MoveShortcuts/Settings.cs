@@ -6,6 +6,8 @@
 
         public bool? getFavIcon = false;
 
+        public string? progress = "auto";
+
         public Dictionary<string, MyFileOptions> fileOptions = new();
 
         public static Dictionary<string, MyFileOptions> defaultFileOptions = new()

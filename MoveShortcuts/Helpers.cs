@@ -14,9 +14,46 @@ using System.Xml.Linq;
 
 namespace MoveShortcuts
 {
+    public enum ProgressMode
+    {
+        Quiet,
+        Log,
+        Cli
+    }
+
     public static class Helpers
     {
+        private static ProgressMode _progressMode = Console.IsOutputRedirected ? ProgressMode.Log : ProgressMode.Cli;
+        private static bool _progressLineActive;
+        private static int _progressLineWidth;
+
         public static string ToString<T>(T o) => $"{o}";
+
+        public static void SetProgressMode(ProgressMode progressMode)
+        {
+            _progressMode = progressMode;
+        }
+
+        public static ProgressMode ResolveProgressMode(string? progress)
+        {
+            if (string.IsNullOrWhiteSpace(progress) || progress.Equals("auto", StringComparison.OrdinalIgnoreCase))
+                return Console.IsOutputRedirected ? ProgressMode.Log : ProgressMode.Cli;
+
+            if (progress.Equals("quiet", StringComparison.OrdinalIgnoreCase))
+                return ProgressMode.Quiet;
+            if (progress.Equals("log", StringComparison.OrdinalIgnoreCase))
+                return ProgressMode.Log;
+            if (progress.Equals("cli", StringComparison.OrdinalIgnoreCase))
+                return ProgressMode.Cli;
+
+            throw new ArgumentException($"Unknown progress mode '{progress}'. Use quiet, log, or cli.");
+        }
+
+        public static void WriteLine(string message)
+        {
+            ClearProgressLine();
+            Console.WriteLine(message);
+        }
 
         public static void Copy(string source, string target)
         {
@@ -99,7 +136,7 @@ namespace MoveShortcuts
             var conflict = GetExternalCommandConflict(shortcutsRoot, target);
             if (conflict != null)
             {
-                Console.WriteLine($"Skipping {Path.GetFileName(target)}: conflicts with {conflict}");
+                WriteLine($"Skipping {Path.GetFileName(target)}: conflicts with {conflict}");
                 return false;
             }
 
@@ -111,7 +148,7 @@ namespace MoveShortcuts
             var conflict = GetExternalCommandConflict(shortcutsRoot, target);
             if (conflict != null)
             {
-                Console.WriteLine($"Skipping {Path.GetFileName(target)}: conflicts with {conflict}");
+                WriteLine($"Skipping {Path.GetFileName(target)}: conflicts with {conflict}");
                 return false;
             }
 
@@ -123,7 +160,7 @@ namespace MoveShortcuts
             var conflict = GetExternalCommandConflict(shortcutsRoot, linkfile);
             if (conflict != null)
             {
-                Console.WriteLine($"Skipping {Path.GetFileName(linkfile)}: conflicts with {conflict}");
+                WriteLine($"Skipping {Path.GetFileName(linkfile)}: conflicts with {conflict}");
                 return false;
             }
 
@@ -139,12 +176,12 @@ namespace MoveShortcuts
             }
             catch (UnauthorizedAccessException ex)
             {
-                Console.WriteLine($"Skipping {Path.GetFileName(target)}: access denied ({ex.Message})");
+                WriteLine($"Skipping {Path.GetFileName(target)}: access denied ({ex.Message})");
                 return false;
             }
             catch (IOException ex)
             {
-                Console.WriteLine($"Skipping {Path.GetFileName(target)}: write failed ({ex.Message})");
+                WriteLine($"Skipping {Path.GetFileName(target)}: write failed ({ex.Message})");
                 return false;
             }
         }
@@ -168,69 +205,89 @@ namespace MoveShortcuts
         {
             if (transformer == null)
                 transformer = ToString<T>;
-            var useInlineProgress = TryGetConsoleWidth(out var width);
             int counter = 1;
             int total = list.Count();
             foreach (var item in list)
             {
                 var msg = $"{counter}/{total}: {transformer(item)}";
-                if (!useInlineProgress)
-                {
-                    Console.WriteLine(msg);
-                    yield return item;
-                    counter++;
-                    continue;
-                }
-
-                try
-                {
-                    var (left, top) = Console.GetCursorPosition();
-                    if (msg.Length > width)
-                    {
-                        msg = new string(msg.Take(width - 3).ToArray()) + "...";
-                    }
-                    else
-                    {
-                        msg = msg + new string(' ', width - msg.Length);
-                    }
-                    Console.Write(msg);
-                    Console.SetCursorPosition(left, top);
-                }
-                catch (IOException)
-                {
-                    useInlineProgress = false;
-                    Console.WriteLine(msg);
-                }
-                catch (InvalidOperationException)
-                {
-                    useInlineProgress = false;
-                    Console.WriteLine(msg);
-                }
+                WriteProgress(msg);
                 yield return item;
                 counter++;
             }
-            Console.WriteLine();
+            ClearProgressLine();
         }
 
-        private static bool TryGetConsoleWidth(out int width)
+        private static void WriteProgress(string message)
         {
-            width = 0;
+            switch (_progressMode)
+            {
+                case ProgressMode.Quiet:
+                    return;
+                case ProgressMode.Log:
+                    Console.WriteLine(message);
+                    return;
+                case ProgressMode.Cli:
+                    WriteInlineProgress(message);
+                    return;
+            }
+        }
+
+        private static void WriteInlineProgress(string message)
+        {
             if (Console.IsOutputRedirected)
-                return false;
+            {
+                Console.WriteLine(message);
+                return;
+            }
 
             try
             {
-                width = Console.BufferWidth;
-                return width > 3;
+                var width = Math.Max(Console.BufferWidth - 1, 1);
+                if (message.Length > width)
+                    message = new string(message.Take(Math.Max(width - 3, 1)).ToArray()) + "...";
+
+                Console.Write("\r" + message);
+                var clearWidth = Math.Max(_progressLineWidth - message.Length, 0);
+                if (clearWidth > 0)
+                    Console.Write(new string(' ', clearWidth));
+                Console.Write("\r" + message);
+                _progressLineWidth = message.Length;
+                _progressLineActive = true;
             }
             catch (IOException)
             {
-                return false;
+                Console.WriteLine(message);
             }
             catch (InvalidOperationException)
             {
-                return false;
+                Console.WriteLine(message);
             }
+        }
+
+        private static void ClearProgressLine()
+        {
+            if (!_progressLineActive)
+                return;
+
+            if (Console.IsOutputRedirected)
+            {
+                _progressLineActive = false;
+                _progressLineWidth = 0;
+                return;
+            }
+
+            try
+            {
+                Console.Write("\r" + new string(' ', _progressLineWidth) + "\r");
+            }
+            catch (IOException)
+            {
+            }
+            catch (InvalidOperationException)
+            {
+            }
+            _progressLineActive = false;
+            _progressLineWidth = 0;
         }
         public static Comparison<T> ReverseComparer<T>(Comparison<T> comparer)
         {
@@ -402,7 +459,7 @@ namespace MoveShortcuts
             catch (Exception ex)
             {
                 // In case of error (e.g., command not found), return null
-                Console.WriteLine($"Error: {ex.Message}");
+                WriteLine($"Error: {ex.Message}");
                 return null;
             }
         }
