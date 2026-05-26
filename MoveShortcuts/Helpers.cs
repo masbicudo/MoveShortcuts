@@ -62,11 +62,23 @@ namespace MoveShortcuts
         public static void Copy(string source, string target)
         {
             var sourceDate = File.GetCreationTimeUtc(source);
+            var sourceLastWrite = File.GetLastWriteTimeUtc(source);
+            var sourceLength = new FileInfo(source).Length;
+            if (File.Exists(target))
+            {
+                var targetInfo = new FileInfo(target);
+                if (targetInfo.Length == sourceLength
+                    && File.GetCreationTimeUtc(target) == sourceDate
+                    && targetInfo.LastWriteTimeUtc == sourceLastWrite)
+                    return;
+            }
+
             File.Copy(
                 source,
                 target,
                 overwrite: true);
             File.SetCreationTimeUtc(target, sourceDate);
+            File.SetLastWriteTimeUtc(target, sourceLastWrite);
         }
 
         public static bool WouldShadowExternalCommand(string shortcutsRoot, string outputPath)
