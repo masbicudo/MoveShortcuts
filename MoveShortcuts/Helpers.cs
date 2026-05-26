@@ -286,6 +286,12 @@ namespace MoveShortcuts
             return CreateShortcut(linkfile, target, icon, workdir);
         }
 
+        public static bool HasUwpShortcutOptions(Dictionary<string, MyFileOptions> fileOptions)
+            => fileOptions.Keys.Any(IsUwpShortcutKey);
+
+        private static bool IsUwpShortcutKey(string key)
+            => !Path.IsPathFullyQualified(key);
+
         private static bool TryWriteShortcutOutput(string target, Action write)
         {
             try
@@ -499,25 +505,25 @@ namespace MoveShortcuts
                 Dictionary<string, string> appNames
             )
         {
+            var matcher = new UwpShortcutOptionMatcher(fileOptions);
+            if (!matcher.HasCandidates)
+                return;
+
+            var shortcutsRoot = Directory.GetParent(shortcutsFolder)?.FullName ?? shortcutsFolder;
+            var shortcutsFolderCreated = false;
             int it = 0;
             foreach (var kv in Helpers.LogProgress(appNames))
             {
                 string name = kv.Key;
                 string appUserModelID = kv.Value;
-                if (!fileOptions.TryGetValue(name, out MyFileOptions? opts))
-                {
-                    var keyMatch = fileOptions.Keys
-                        .Where(x => !Path.IsPathFullyQualified(x))
-                        .FirstOrDefault(
-                            k => Regex.IsMatch(name, "^" + k + "$", RegexOptions.IgnoreCase));
-                    if (keyMatch != null)
-                        opts = fileOptions[keyMatch];
-                }
-                if (opts != null)
+                if (matcher.TryGetOptions(name, out _))
                 {
                     var fullPath = Path.Combine(shortcutsFolder, name + ".lnk");
-                    Directory.CreateDirectory(shortcutsFolder);
-                    var shortcutsRoot = Directory.GetParent(shortcutsFolder)?.FullName ?? shortcutsFolder;
+                    if (!shortcutsFolderCreated)
+                    {
+                        Directory.CreateDirectory(shortcutsFolder);
+                        shortcutsFolderCreated = true;
+                    }
                     Helpers.CreateShortcutOutput(
                         shortcutsRoot,
                         fullPath,
@@ -525,6 +531,47 @@ namespace MoveShortcuts
                         );
                 }
                 it++;
+            }
+        }
+
+        private sealed class UwpShortcutOptionMatcher
+        {
+            private readonly Dictionary<string, MyFileOptions> _exactOptions;
+            private readonly List<(Regex Pattern, MyFileOptions Options)> _patternOptions;
+
+            public UwpShortcutOptionMatcher(Dictionary<string, MyFileOptions> fileOptions)
+            {
+                _exactOptions = new Dictionary<string, MyFileOptions>(StringComparer.OrdinalIgnoreCase);
+                foreach (var option in fileOptions)
+                {
+                    if (!_exactOptions.ContainsKey(option.Key))
+                        _exactOptions[option.Key] = option.Value;
+                }
+
+                _patternOptions = fileOptions
+                    .Where(kv => IsUwpShortcutKey(kv.Key))
+                    .Select(kv => (new Regex("^" + kv.Key + "$", RegexOptions.IgnoreCase), kv.Value))
+                    .ToList();
+            }
+
+            public bool HasCandidates => _patternOptions.Count > 0;
+
+            public bool TryGetOptions(string appName, out MyFileOptions? options)
+            {
+                if (_exactOptions.TryGetValue(appName, out options))
+                    return true;
+
+                foreach (var patternOption in _patternOptions)
+                {
+                    if (patternOption.Pattern.IsMatch(appName))
+                    {
+                        options = patternOption.Options;
+                        return true;
+                    }
+                }
+
+                options = null;
+                return false;
             }
         }
 

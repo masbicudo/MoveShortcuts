@@ -81,7 +81,7 @@ List<string> allSourceFiles = new();
 // listing inside the configurations file. These will be created
 // in a subfolder of the shortcuts folder
 var uwpShortcutsFolder = Path.Combine(shortcuts, "UWP Apps");
-if (options.sources.uwpApps)
+if (options.sources.uwpApps && Helpers.HasUwpShortcutOptions(fileOptions))
 {
     Helpers.WriteLine("Creating shortcuts for UWP programs:");
     var uwpApps = Helpers.GetUwpApps();
