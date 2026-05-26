@@ -67,6 +67,7 @@ A few useful command-line options:
 MoveShortcuts --progress quiet
 MoveShortcuts --progress log
 MoveShortcuts --progress cli
+MoveShortcuts --refresh-uwp-cache
 ```
 
 Progress output adapts by default:
@@ -80,6 +81,15 @@ You can always check available commands with:
 MoveShortcuts --help
 ```
 
+UWP / AppsFolder enumeration is cached in:
+
+```bash
+move-shortcuts-uwp-cache.json
+```
+
+Normal runs reuse this cache while the Windows package signature is unchanged.
+Use `--refresh-uwp-cache` to rebuild it from AppsFolder.
+
 ---
 
 ## Design principles
@@ -87,6 +97,10 @@ MoveShortcuts --help
 If you're curious about the internal decisions behind how this works, see:
 
 [Design Principles](docs/design-principles.md)
+
+For details on the UWP cache design, see:
+
+[UWP Cache Design](docs/uwp-cache-design.md)
 
 It covers things like:
 

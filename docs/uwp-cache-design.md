@@ -49,11 +49,18 @@ Proposed schema:
     "packageCount": 591,
     "hash": "sha256:..."
   },
-  "apps": {
-    "Calculadora": "Microsoft.WindowsCalculator_8wekyb3d8bbwe!App"
-  }
+  "apps": [
+    {
+      "name": "Calculadora",
+      "appUserModelId": "Microsoft.WindowsCalculator_8wekyb3d8bbwe!App"
+    }
+  ]
 }
 ```
+
+Apps are stored as an array instead of a JSON object because AppsFolder can
+contain display names that differ only by case. Some JSON tooling, including
+PowerShell's default `ConvertFrom-Json`, treats object keys case-insensitively.
 
 ## Package Signature
 

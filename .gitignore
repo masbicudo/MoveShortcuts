@@ -363,3 +363,5 @@ MigrationBackup/
 FodyWeavers.xsd
 *.bak
 /MoveShortcuts/move-shortcuts-options.json
+/move-shortcuts-uwp-cache.json
+/MoveShortcuts/move-shortcuts-uwp-cache.json

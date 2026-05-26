@@ -18,6 +18,7 @@ if (IsHelpRequested(args))
 }
 
 var progressOverride = GetProgressOverride(args);
+var refreshUwpCache = IsRefreshUwpCacheRequested(args);
 var optsFileName = "move-shortcuts-options.json";
 
 if (IsInitRequested(args))
@@ -84,7 +85,11 @@ var uwpShortcutsFolder = Path.Combine(shortcuts, "UWP Apps");
 if (options.sources.uwpApps && Helpers.HasUwpShortcutOptions(fileOptions))
 {
     Helpers.WriteLine("Creating shortcuts for UWP programs:");
-    var uwpApps = Helpers.GetUwpApps();
+    var uwpApps = UwpAppCacheProvider.GetUwpApps(
+        UwpAppCacheProvider.DefaultCacheFileName,
+        refreshUwpCache,
+        Helpers.GetUwpApps,
+        message => Helpers.WriteLine(message));
     Helpers.CreateUWPShortcuts(uwpShortcutsFolder, fileOptions, uwpApps);
 }
 
@@ -550,6 +555,11 @@ static bool IsInitRequested(string[] args)
     return args.Any(arg => arg.Equals("init", StringComparison.OrdinalIgnoreCase));
 }
 
+static bool IsRefreshUwpCacheRequested(string[] args)
+{
+    return args.Any(arg => arg.Equals("--refresh-uwp-cache", StringComparison.OrdinalIgnoreCase));
+}
+
 static void RunInit(string optsFileName, string? progressOverride)
 {
     Helpers.SetProgressMode(Helpers.ResolveProgressMode(progressOverride ?? "log"));
@@ -805,6 +815,9 @@ static void PrintHelp()
 
           --cli
               Use compact single-line terminal progress.
+
+          --refresh-uwp-cache
+              Ignore any existing UWP app cache and rebuild it from AppsFolder.
 
         Configuration:
           Reads move-shortcuts-options.json from the current working directory.
