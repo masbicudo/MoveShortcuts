@@ -1,4 +1,6 @@
-﻿// See https://aka.ms/new-console-template for more information
+﻿// SPDX-License-Identifier: Apache-2.0
+
+// See https://aka.ms/new-console-template for more information
 using HtmlAgilityPack;
 using MoveShortcuts;
 using Newtonsoft.Json;

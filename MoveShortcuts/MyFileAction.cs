@@ -1,4 +1,6 @@
-﻿namespace MoveShortcuts
+﻿// SPDX-License-Identifier: Apache-2.0
+
+namespace MoveShortcuts
 {
     public class MyFileAction
     {

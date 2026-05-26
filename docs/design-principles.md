@@ -33,7 +33,7 @@ The active configuration is read from the current working directory as `move-sho
 For the current Debug build, the intended working directory is:
 
 ```text
-D:\Projects\MoveShortcuts\MoveShortcuts\bin\Debug\net10.0-windows
+{workspace}/MoveShortcuts/bin/Debug/net10.0-windows
 ```
 
 Running the executable from another directory may create or read a different options file, which can be confusing.
@@ -43,7 +43,7 @@ Running the executable from another directory may create or read a different opt
 The intended local build output is:
 
 ```text
-D:\Projects\MoveShortcuts\MoveShortcuts\bin\Debug\net10.0-windows
+{workspace}/MoveShortcuts/bin/Debug/net10.0-windows
 ```
 
 Avoid keeping stale `bin` or `obj` target directories around unless actively testing another target framework.

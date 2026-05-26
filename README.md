@@ -1,53 +1,107 @@
-# Move Shortcuts Project
+# Move Shortcuts
 
-Helps in organizing the link mess that Choco makes on your Desktop... and more!
+Move Shortcuts exists for a simple reason: shortcut clutter gets out of hand fast.
 
-## Introduction
+Installers drop icons everywhere — Desktop, Start Menu, hidden folders — and over time things become harder to find than they should be. This tool takes a more intentional approach: gather shortcuts, organize them in one place, and optionally make them easier to launch.
 
-When using Chocolatey to install or update applications my desktop often
-gets cluttered with program links. What I want, is to free myself the work
-to clean up the mess, but also I don't want to lose the links...
-what to do then?
+Think of it as a way to “reset” shortcut chaos into something clean and predictable.
 
-What this program does is to create a new folder at `C:\Shortcuts` where
-it places every shortcut it finds as being clutter to the Desktop.
-This became so useful because then I added this folder to the `PATH`
-environment variable, and made lists of small commands to associate with
-each one of these programs.
+---
 
-For example, the link `"Visual Studio Code"` will be sent to the special
-shortcuts folder when found on the Desktop, but also new links will be created:
-`"code"` and `"coda"`. The first open VS Code normally,
-the second opens it with elevated privileges.
+## Quick start
 
-## Design principles
-
-See [Move Shortcuts Design Principles](docs/design-principles.md) for the PATH
-safety rules, vendor shortcut behavior, alias policy, group folder behavior, and
-the intended Debug output/configuration location.
-
-## Progress output
-
-Create a starter configuration with:
+Start by creating a configuration:
 
 ```text
 MoveShortcuts init
 ```
 
-`init` asks which sources to scan, whether to generate initial-based aliases,
-and whether desktop shortcuts should be removed after managed shortcuts are
-created. It only writes `move-shortcuts-options.json`; you can review that file
-before running MoveShortcuts for real.
+This step is interactive. It asks what should be included (Desktop, Start Menu, UWP apps), whether alias shortcuts should be created, and whether Desktop shortcuts should be removed after everything is organized.
 
-Progress can be controlled from the command line:
+Nothing is changed immediately — a config file is written first:
+
+```bash
+move-shortcuts-options.json
+```
+
+You can review it before doing anything else.
+
+Once you're happy with the configuration, run:
+
+```bash
+MoveShortcuts
+```
+
+---
+
+## What it does
+
+By default, everything ends up in a single folder:
+
+```bash
+C:\Shortcuts
+```
+
+This can be changed in the configuration file.
+
+From there, the tool works through your chosen shortcut sources:
+
+- Desktop shortcuts  
+- Start Menu shortcuts  
+- UWP / AppsFolder programs  
+
+It can also:
+
+- Clean up processed Desktop shortcuts  
+- Create shorter alias shortcuts based on initials (useful for quick launching)  
+
+The goal is not to change how you use Windows — just to reduce friction.
+
+---
+
+## Notes
+
+A few useful command-line options:
 
 ```text
-MoveShortcuts --help
 MoveShortcuts --progress quiet
 MoveShortcuts --progress log
 MoveShortcuts --progress cli
 ```
 
-`-h`, `-help`, `--help`, and `/?` show usage. `--quiet`, `--log`, and `--cli`
-are shortcuts for those progress modes. The default is automatic: compact CLI
-progress in a terminal, and log-style progress when output is redirected.
+Progress output adapts by default:
+
+- Compact output in terminals  
+- Log-style output when redirected  
+
+You can always check available commands with:
+
+```bash
+MoveShortcuts --help
+```
+
+---
+
+## Design principles
+
+If you're curious about the internal decisions behind how this works, see:
+
+[Design Principles](docs/design-principles.md)
+
+It covers things like:
+
+- PATH safety rules  
+- Vendor shortcut handling  
+- Alias generation rules  
+- Folder grouping behavior  
+- Debug and config locations
+
+## Closing note
+
+This tool is intentionally small in scope.
+
+It doesn’t try to replace Windows behavior — it just makes shortcut management feel less messy and more deliberate.
+
+## License
+
+This project is licensed under the Apache License, Version 2.0. See the [LICENSE](LICENSE) file for details.

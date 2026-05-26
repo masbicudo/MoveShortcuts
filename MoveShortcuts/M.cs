@@ -1,4 +1,6 @@
-﻿using System.Text.RegularExpressions;
+﻿// SPDX-License-Identifier: Apache-2.0
+
+using System.Text.RegularExpressions;
 
 namespace MoveShortcuts
 {

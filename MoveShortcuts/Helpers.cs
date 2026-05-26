@@ -1,5 +1,8 @@
-﻿using Microsoft.Win32;
+﻿// SPDX-License-Identifier: Apache-2.0
+
+using Microsoft.Win32;
 using Microsoft.WindowsAPICodePack.Shell;
+
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
