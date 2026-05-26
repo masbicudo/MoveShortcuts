@@ -102,6 +102,14 @@ For details on the UWP cache design, see:
 
 [UWP Cache Design](docs/uwp-cache-design.md)
 
+There is also a short performance notebook:
+
+[Performance Optimizations](docs/optimizations.md)
+
+The project has a small `research/` folder documenting the UWP/AppModel
+investigation behind the cache. It is not required to use the tool, but it shows
+the kind of care taken around Windows-specific behavior and performance.
+
 It covers things like:
 
 - PATH safety rules  
