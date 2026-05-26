@@ -17,6 +17,7 @@ namespace MoveShortcuts
         public List<string> AltNames { get; } = new List<string>();
         public List<string> ElevNames { get; } = new List<string>();
         public string Target { get; set; } = null;
+        public string Arguments { get; set; } = null;
         public List<string> Groups { get; } = new List<string>();
         public string WorkDir { get; set; } = null;
         /// <summary>

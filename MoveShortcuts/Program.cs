@@ -19,7 +19,15 @@ if (IsHelpRequested(args))
 
 var progressOverride = GetProgressOverride(args);
 var refreshUwpCache = IsRefreshUwpCacheRequested(args);
+var userPathRequest = GetPathPlacementRequest(args, "--add-user-path");
+var machinePathRequest = GetPathPlacementRequest(args, "--add-machine-path");
 var optsFileName = "move-shortcuts-options.json";
+
+if (IsEditRequested(args))
+{
+    RunEdit(optsFileName);
+    return;
+}
 
 if (IsInitRequested(args))
 {
@@ -43,11 +51,6 @@ else
 }
 
 Helpers.SetProgressMode(Helpers.ResolveProgressMode(progressOverride ?? options.progress));
-Helpers.WriteLine("Workdir: " + Directory.GetCurrentDirectory());
-Helpers.WriteLine("Executable: " + System.Reflection.Assembly.GetExecutingAssembly().Location);
-Helpers.WriteLine((foundOptionsFile ? "Found" : "New") + " data file: " + optsFileName);
-
-var log = new StreamWriter(File.Open("move-shortcuts.log", FileMode.Append));
 
 var fileOptions = options.fileOptions;
 InitOptionsBuilder.ApplyGlobalCleanupSetting(options);
@@ -55,6 +58,16 @@ var shortcuts = options.shortcuts;
 
 // ensuring shortcuts directory is there
 Directory.CreateDirectory(shortcuts);
+var pathOnlyRequest = IsPathOnlyRequest(args, userPathRequest, machinePathRequest);
+ApplyPathSettings(options, shortcuts, userPathRequest, machinePathRequest);
+if (pathOnlyRequest)
+    return;
+
+Helpers.WriteLine("Workdir: " + Directory.GetCurrentDirectory());
+Helpers.WriteLine("Executable: " + System.Reflection.Assembly.GetExecutingAssembly().Location);
+Helpers.WriteLine((foundOptionsFile ? "Found" : "New") + " data file: " + optsFileName);
+
+var log = new StreamWriter(File.Open("move-shortcuts.log", FileMode.Append));
 
 //
 // Collecting files to process
@@ -341,7 +354,7 @@ foreach (var action in Helpers.LogProgress(actionsList, a => a.FileName))
                 if (linTypes.Contains("lnk", StringComparer.OrdinalIgnoreCase))
                 {
                     var altFullPathLnk = Path.Combine(shortcuts, name) + ".lnk";
-                    var created = Helpers.CreateShortcutOutput(shortcuts, altFullPathLnk, targetObjectToOpen, workdir: workdir);
+                    var created = Helpers.CreateShortcutOutput(shortcuts, altFullPathLnk, targetObjectToOpen, workdir: workdir, arguments: action.Options.Arguments);
                     if (created)
                         MakeGroups(shortcuts, action, altFullPathLnk);
                     if (created && elevated)
@@ -351,19 +364,19 @@ foreach (var action in Helpers.LogProgress(actionsList, a => a.FileName))
                 {
                     var altFullPathPs1 = Path.Combine(shortcuts, name) + ".ps1";
                     if (!Helpers.WouldShadowExternalCommand(shortcuts, altFullPathPs1))
-                        Helpers.CreatePowerShellProxy(altFullPathPs1, targetObjectToOpen, elevated, workdir);
+                        Helpers.CreatePowerShellProxy(altFullPathPs1, targetObjectToOpen, elevated, workdir, action.Options.Arguments);
                 }
                 if (linTypes.Contains("cmd", StringComparer.OrdinalIgnoreCase))
                 {
                     var altFullPathCmd = Path.Combine(shortcuts, name) + ".cmd";
                     if (!Helpers.WouldShadowExternalCommand(shortcuts, altFullPathCmd))
-                        Helpers.CreateCommandPromptProxy(altFullPathCmd, targetObjectToOpen, elevated, workdir);
+                        Helpers.CreateCommandPromptProxy(altFullPathCmd, targetObjectToOpen, elevated, workdir, action.Options.Arguments);
                 }
                 if (linTypes.Contains("sh", StringComparer.OrdinalIgnoreCase))
                 {
                     var altFullPathSh = Path.Combine(shortcuts, name) + ".sh";
                     if (!Helpers.WouldShadowExternalCommand(shortcuts, altFullPathSh))
-                        Helpers.CreateGitBashProxy(altFullPathSh, targetObjectToOpen, elevated, workdir);
+                        Helpers.CreateGitBashProxy(altFullPathSh, targetObjectToOpen, elevated, workdir, action.Options.Arguments);
                 }
             }
             CreateLocalLink(action.FileName, false);
@@ -556,9 +569,175 @@ static bool IsInitRequested(string[] args)
     return args.Any(arg => arg.Equals("init", StringComparison.OrdinalIgnoreCase));
 }
 
+static bool IsEditRequested(string[] args)
+{
+    return args.Any(arg => arg.Equals("edit", StringComparison.OrdinalIgnoreCase));
+}
+
 static bool IsRefreshUwpCacheRequested(string[] args)
 {
     return args.Any(arg => arg.Equals("--refresh-uwp-cache", StringComparison.OrdinalIgnoreCase));
+}
+
+static bool IsPathOnlyRequest(string[] args, PathPlacement? userPathRequest, PathPlacement? machinePathRequest)
+{
+    if (!userPathRequest.HasValue && !machinePathRequest.HasValue)
+        return false;
+
+    for (var i = 0; i < args.Length; i++)
+    {
+        var arg = args[i];
+        if (arg.StartsWith("--add-user-path=", StringComparison.OrdinalIgnoreCase) ||
+            arg.StartsWith("--add-machine-path=", StringComparison.OrdinalIgnoreCase))
+            continue;
+
+        if (arg.Equals("--add-user-path", StringComparison.OrdinalIgnoreCase) ||
+            arg.Equals("--add-machine-path", StringComparison.OrdinalIgnoreCase))
+        {
+            if (i + 1 < args.Length && IsPathPlacementValue(args[i + 1]))
+                i++;
+            continue;
+        }
+
+        if (arg.Equals("--quiet", StringComparison.OrdinalIgnoreCase) ||
+            arg.Equals("--log", StringComparison.OrdinalIgnoreCase) ||
+            arg.Equals("--cli", StringComparison.OrdinalIgnoreCase) ||
+            arg.StartsWith("--progress=", StringComparison.OrdinalIgnoreCase))
+            continue;
+
+        if (arg.Equals("--progress", StringComparison.OrdinalIgnoreCase))
+        {
+            i++;
+            continue;
+        }
+
+        return false;
+    }
+
+    return true;
+}
+
+static PathPlacement? GetPathPlacementRequest(string[] args, string optionName)
+{
+    for (var i = 0; i < args.Length; i++)
+    {
+        var arg = args[i];
+        if (arg.StartsWith(optionName + "=", StringComparison.OrdinalIgnoreCase))
+            return ParsePathPlacement(arg[(optionName.Length + 1)..]);
+
+        if (!arg.Equals(optionName, StringComparison.OrdinalIgnoreCase))
+            continue;
+
+        if (i + 1 < args.Length && TryParsePathPlacement(args[i + 1], out var placement))
+            return placement;
+
+        return PathPlacement.AppendIfMissing;
+    }
+
+    return null;
+}
+
+static bool IsPathPlacementValue(string arg)
+    => arg.Equals("auto", StringComparison.OrdinalIgnoreCase) ||
+       arg.Equals("first", StringComparison.OrdinalIgnoreCase) ||
+       arg.Equals("last", StringComparison.OrdinalIgnoreCase);
+
+static void RunEdit(string optsFileName)
+{
+    var optionsPath = Path.GetFullPath(optsFileName);
+    if (!File.Exists(optionsPath))
+    {
+        Console.WriteLine("No data file found: " + optsFileName);
+        Console.WriteLine("Run MoveShortcuts init to create one.");
+        return;
+    }
+
+    try
+    {
+        using var process = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = optionsPath,
+            UseShellExecute = true,
+        });
+    }
+    catch
+    {
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = "notepad.exe",
+            Arguments = "\"" + optionsPath + "\"",
+            UseShellExecute = true,
+        });
+    }
+}
+
+static void ApplyPathSettings(Settings options, string shortcuts, PathPlacement? userPathRequest, PathPlacement? machinePathRequest)
+{
+    var addToUserPath = options.path.addToUserPath || userPathRequest.HasValue;
+    var addToMachinePath = options.path.addToMachinePath || machinePathRequest.HasValue;
+    var userPlacement = userPathRequest ?? ParsePathPlacement(options.path.userPathPlacement);
+    var machinePlacement = machinePathRequest ?? ParsePathPlacement(options.path.machinePathPlacement);
+
+    if (addToUserPath)
+    {
+        WritePathUpdateResult(
+            PathEnvironmentManager.AddToUserPath(shortcuts, userPlacement),
+            shortcuts,
+            "current user PATH");
+    }
+
+    if (addToMachinePath)
+    {
+        WritePathUpdateResult(
+            PathEnvironmentManager.AddToMachinePathElevated(shortcuts, machinePlacement),
+            shortcuts,
+            "machine PATH");
+    }
+}
+
+static void WritePathUpdateResult(PathUpdateStatus status, string shortcuts, string targetName)
+{
+    switch (status)
+    {
+        case PathUpdateStatus.AlreadyPresent:
+            Helpers.WriteLine($"{shortcuts} is already in the {targetName}.");
+            break;
+        case PathUpdateStatus.Updated:
+            Helpers.WriteLine($"Added {shortcuts} to the {targetName}.");
+            break;
+        case PathUpdateStatus.CancelledOrFailed:
+            Helpers.WriteLine($"Could not add {shortcuts} to the {targetName}; the elevated update may have been cancelled.");
+            break;
+    }
+}
+
+static PathPlacement ParsePathPlacement(string? value)
+{
+    if (TryParsePathPlacement(value, out var placement))
+        return placement;
+
+    throw new ArgumentException($"Unknown PATH placement '{value}'. Use auto, first, or last.");
+}
+
+static bool TryParsePathPlacement(string? value, out PathPlacement placement)
+{
+    placement = PathPlacement.AppendIfMissing;
+    if (string.IsNullOrWhiteSpace(value) || value.Equals("auto", StringComparison.OrdinalIgnoreCase))
+        return true;
+
+    if (value.Equals("first", StringComparison.OrdinalIgnoreCase))
+    {
+        placement = PathPlacement.PrependOrMove;
+        return true;
+    }
+
+    if (value.Equals("last", StringComparison.OrdinalIgnoreCase))
+    {
+        placement = PathPlacement.AppendOrMove;
+        return true;
+    }
+
+    return false;
 }
 
 static void RunInit(string optsFileName, string? progressOverride)
@@ -581,8 +760,23 @@ static void RunInit(string optsFileName, string? progressOverride)
         },
         cleanup = new CleanupSettings(),
         aliases = new AliasSettings(),
+        path = new PathSettings(),
         fileOptions = new Dictionary<string, MyFileOptions>(),
     };
+
+    if (!PathEnvironmentManager.IsDirectoryInTargetPath(options.shortcuts, EnvironmentVariableTarget.User))
+    {
+        options.path.addToUserPath = AskYesNo(
+            "Add the Shortcuts folder to your current user PATH?",
+            defaultValue: true);
+    }
+
+    if (!PathEnvironmentManager.IsDirectoryInTargetPath(options.shortcuts, EnvironmentVariableTarget.Machine))
+    {
+        options.path.addToMachinePath = AskYesNo(
+            "Also add it to the machine PATH for elevated/admin terminals? This will request UAC when the tool runs.",
+            defaultValue: false);
+    }
 
     options.cleanup.deleteDesktopShortcuts = options.sources.desktop
         && AskYesNo(
@@ -596,10 +790,27 @@ static void RunInit(string optsFileName, string? progressOverride)
     if (options.aliases.generateInitials)
         options.aliases.minimumLength = AskInt("Minimum generated alias length", defaultValue: 2, minimum: 1);
 
+    var addSelfReference = AskYesNo(
+        "Add MoveShortcuts self commands to the options file? Suggested command: mvshct.",
+        defaultValue: true);
+    var selfCommandName = SelfReferenceBuilder.DefaultCommandName;
+    if (addSelfReference)
+        selfCommandName = AskString("MoveShortcuts command name", SelfReferenceBuilder.DefaultCommandName);
+
     Helpers.WriteLine("");
     Helpers.WriteLine("Scanning selected sources...");
     var initScan = ScanForInit(options);
     options.fileOptions = initScan.FileOptions;
+    if (addSelfReference)
+    {
+        var selfOptions = SelfReferenceBuilder.CreateSelfReferenceOptions(
+            selfCommandName,
+            selfCommandName + "-edit",
+            System.Reflection.Assembly.GetExecutingAssembly().Location,
+            Environment.ProcessPath);
+        foreach (var kv in selfOptions)
+            options.fileOptions[kv.Key] = kv.Value;
+    }
 
     Helpers.WriteLine("");
     Helpers.WriteLine("Your choices will affect:");
@@ -627,6 +838,13 @@ static void RunInit(string optsFileName, string? progressOverride)
         if (initScan.SkippedAliasCount > 0)
             Helpers.WriteLine($"- {initScan.SkippedAliasCount} generated aliases were skipped because they conflict with existing commands or aliases");
     }
+
+    if (options.path.addToUserPath)
+        Helpers.WriteLine($"- {options.shortcuts} will be added to the current user PATH when MoveShortcuts runs");
+    if (options.path.addToMachinePath)
+        Helpers.WriteLine($"- {options.shortcuts} will be added to the machine PATH using a one-time elevated helper when MoveShortcuts runs");
+    if (addSelfReference)
+        Helpers.WriteLine($"- self commands will be added: {selfCommandName}.cmd and {selfCommandName}-edit.cmd");
 
     Helpers.WriteLine("");
     Helpers.WriteLine($"This will just create the options file at {outputPath}");
@@ -820,6 +1038,14 @@ static void PrintHelp()
           --refresh-uwp-cache
               Ignore any existing UWP app cache and rebuild it from AppsFolder.
 
+          --add-user-path
+              Add the configured Shortcuts folder to the current user PATH.
+              Optional placement: auto, first, last.
+
+          --add-machine-path
+              Add the configured Shortcuts folder to the machine PATH using a one-time UAC prompt.
+              Optional placement: auto, first, last.
+
         Caches:
           move-shortcuts-uwp-cache.json
               Stores AppsFolder enumeration while the Windows package signature is unchanged.
@@ -835,6 +1061,9 @@ static void PrintHelp()
           init
               Ask a few questions, scan selected sources, estimate the effect,
               and create move-shortcuts-options.json without creating shortcuts.
+
+          edit
+              Open move-shortcuts-options.json with the default editor, falling back to Notepad.
 
         Default progress:
           auto: cli in an interactive terminal, log when output is redirected.

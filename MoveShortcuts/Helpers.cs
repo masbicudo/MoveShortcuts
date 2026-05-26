@@ -274,7 +274,7 @@ namespace MoveShortcuts
             return TryWriteShortcutOutput(target, () => File.WriteAllText(target, contents));
         }
 
-        public static bool CreateShortcutOutput(string shortcutsRoot, string linkfile, string target, string icon = null, string workdir = null)
+        public static bool CreateShortcutOutput(string shortcutsRoot, string linkfile, string target, string icon = null, string workdir = null, string arguments = null)
         {
             var conflict = GetExternalCommandConflict(shortcutsRoot, linkfile);
             if (conflict != null)
@@ -283,7 +283,7 @@ namespace MoveShortcuts
                 return false;
             }
 
-            return CreateShortcut(linkfile, target, icon, workdir);
+            return CreateShortcut(linkfile, target, icon, workdir, arguments);
         }
 
         public static bool HasUwpShortcutOptions(Dictionary<string, MyFileOptions> fileOptions)
@@ -419,9 +419,9 @@ namespace MoveShortcuts
             return (x, y) => -comparer(x, y);
         }
 
-        public static bool CreateShortcut(string linkfile, string target, string icon = null, string workdir = null)
+        public static bool CreateShortcut(string linkfile, string target, string icon = null, string workdir = null, string arguments = null)
         {
-            if (icon == null && workdir == null && ShortcutBinaryInspector.ContainsTargetHint(linkfile, target))
+            if (icon == null && workdir == null && arguments == null && ShortcutBinaryInspector.ContainsTargetHint(linkfile, target))
                 return true;
 
             dynamic shell = _shortcutShell.Value;
@@ -437,6 +437,7 @@ namespace MoveShortcuts
                     }
                     else
                         lnk.TargetPath = target;
+                    if (arguments != null) lnk.Arguments = arguments;
                     if (workdir != null) lnk.WorkingDirectory = workdir;
                     if (icon != null) lnk.IconLocation = icon;
                     lnk.Save();
@@ -611,9 +612,9 @@ namespace MoveShortcuts
             SCRIPT_PLACEHOLDER
             """;
 
-        public static void CreatePowerShellProxy(string altFullPathPs1, string targetObjectToOpen, bool elevated, string? workdir)
+        public static void CreatePowerShellProxy(string altFullPathPs1, string targetObjectToOpen, bool elevated, string? workdir, string? arguments = null)
         {
-            var script = $"& \"{targetObjectToOpen}\" @args";
+            var script = $"& \"{targetObjectToOpen}\"{FormatProxyArguments(arguments)} @args";
 
             if (workdir != null)
             {
@@ -657,22 +658,26 @@ namespace MoveShortcuts
             SCRIPT_PLACEHOLDER
             """;
 
-        public static void CreateCommandPromptProxy(string altFullPathCmd, string targetObjectToOpen, bool elevated, string? workdir)
+        public static void CreateCommandPromptProxy(string altFullPathCmd, string targetObjectToOpen, bool elevated, string? workdir, string? arguments = null)
         {
-            var script = $"\"{targetObjectToOpen}\" %*";
+            var script = $"""
+                "{targetObjectToOpen}"{FormatProxyArguments(arguments)} %*
+                set "exitCode=%ERRORLEVEL%"
+                """;
 
             if (workdir != null)
             {
                 script = $"""
-                    cd "{workdir}"
+                    pushd "{workdir}"
                     {script}
+                    popd
                     """;
             }
             if (elevated)
             {
                 script = SelfElevatedCmdTemplate.Replace("SCRIPT_PLACEHOLDER", script);
             }
-            script = $"@echo off\r\n{script}";
+            script = $"@echo off\r\n{script}\r\nexit /b %exitCode%";
             File.WriteAllText(altFullPathCmd, script);
         }
 
@@ -711,9 +716,9 @@ namespace MoveShortcuts
             SCRIPT_PLACEHOLDER
             """;
 
-        public static void CreateGitBashProxy(string altFullPathSh, string targetObjectToOpen, bool elevated, string? workdir)
+        public static void CreateGitBashProxy(string altFullPathSh, string targetObjectToOpen, bool elevated, string? workdir, string? arguments = null)
         {
-            var script = $"\"{targetObjectToOpen}\" $@";
+            var script = $"\"{targetObjectToOpen}\"{FormatProxyArguments(arguments)} \"$@\"";
 
             if (workdir != null)
             {
@@ -728,5 +733,8 @@ namespace MoveShortcuts
             }
             File.WriteAllText(altFullPathSh, script);
         }
+
+        private static string FormatProxyArguments(string? arguments)
+            => string.IsNullOrWhiteSpace(arguments) ? "" : " " + arguments;
     }
 }

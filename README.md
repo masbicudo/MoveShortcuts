@@ -68,6 +68,10 @@ MoveShortcuts --progress quiet
 MoveShortcuts --progress log
 MoveShortcuts --progress cli
 MoveShortcuts --refresh-uwp-cache
+MoveShortcuts --add-user-path
+MoveShortcuts --add-user-path first
+MoveShortcuts --add-machine-path
+MoveShortcuts edit
 ```
 
 Progress output adapts by default:
@@ -80,6 +84,18 @@ You can always check available commands with:
 ```bash
 MoveShortcuts --help
 ```
+
+`MoveShortcuts edit` opens the active `move-shortcuts-options.json` with your
+default editor, falling back to Notepad if needed.
+
+During `init`, MoveShortcuts can also add your shortcuts folder to PATH if it is
+not already there. User PATH is updated directly; machine PATH uses a one-time
+UAC prompt when you choose that option.
+
+PATH setup is conservative by default: if the shortcuts folder is already in
+PATH, its position is left alone. New entries are appended to the end. For
+explicit control, use `first` to move it to the front or `last` to move it to
+the end.
 
 UWP / AppsFolder enumeration is cached in:
 

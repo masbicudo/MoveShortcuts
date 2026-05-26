@@ -73,6 +73,7 @@ namespace MoveShortcuts
             options.sources ??= new SourceSettings();
             options.cleanup ??= new CleanupSettings();
             options.aliases ??= new AliasSettings();
+            options.path ??= new PathSettings();
             options.fileOptions ??= new Dictionary<string, MyFileOptions>();
         }
     }

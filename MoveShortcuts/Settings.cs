@@ -16,6 +16,8 @@ namespace MoveShortcuts
 
         public AliasSettings aliases = new();
 
+        public PathSettings path = new();
+
         public Dictionary<string, MyFileOptions> fileOptions = new();
 
         public static Dictionary<string, MyFileOptions> defaultFileOptions = new()
@@ -102,5 +104,13 @@ namespace MoveShortcuts
     {
         public bool generateInitials = false;
         public int minimumLength = 2;
+    }
+
+    public class PathSettings
+    {
+        public bool addToUserPath = false;
+        public bool addToMachinePath = false;
+        public string userPathPlacement = "auto";
+        public string machinePathPlacement = "auto";
     }
 }

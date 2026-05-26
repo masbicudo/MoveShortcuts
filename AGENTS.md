@@ -25,6 +25,8 @@ described in RFC 2119.
   `MoveShortcuts/bin/Debug/net10.0-windows`.
 - `C:\Shortcuts` is commonly on PATH, so root-level outputs are command-surface
   changes, not just files.
+- PATH setup MUST NOT reorder an existing shortcuts entry unless the user asks
+  for an explicit placement mode.
 - Build output, local configs, logs, and generated caches MUST NOT be committed
   unless intentionally added as test fixtures or documentation examples.
 
