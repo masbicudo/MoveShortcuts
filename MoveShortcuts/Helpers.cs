@@ -262,11 +262,8 @@ namespace MoveShortcuts
                 return false;
             }
 
-            if (manifest != null && !manifest.CanWrite(target))
-            {
-                WriteLine($"Skipping {Path.GetFileName(target)}: file exists but is not owned by MoveShortcuts.");
+            if (manifest != null && !manifest.CanWriteOrHandleConflict(target))
                 return false;
-            }
 
             var written = TryWriteShortcutOutput(target, () => Copy(source, target));
             if (written)
@@ -286,11 +283,8 @@ namespace MoveShortcuts
                 return false;
             }
 
-            if (manifest != null && !manifest.CanWrite(target))
-            {
-                WriteLine($"Skipping {Path.GetFileName(target)}: file exists but is not owned by MoveShortcuts.");
+            if (manifest != null && !manifest.CanWriteOrHandleConflict(target))
                 return false;
-            }
 
             var written = TryWriteShortcutOutput(target, () => File.WriteAllText(target, contents));
             if (written)
@@ -310,11 +304,8 @@ namespace MoveShortcuts
                 return false;
             }
 
-            if (manifest != null && !manifest.CanWrite(linkfile))
-            {
-                WriteLine($"Skipping {Path.GetFileName(linkfile)}: file exists but is not owned by MoveShortcuts.");
+            if (manifest != null && !manifest.CanWriteOrHandleConflict(linkfile))
                 return false;
-            }
 
             var created = CreateShortcut(linkfile, target, icon, workdir, arguments);
             if (created)

@@ -29,6 +29,7 @@ namespace MoveShortcuts
 
         public OwnedOutputManifestFile File { get; }
         public bool ManifestExisted { get; }
+        public bool AutoIgnoreConflicts { get; set; }
 
         public IReadOnlyCollection<string> TouchedRelativePaths => _touched;
         public IReadOnlyDictionary<string, OwnedOutputEntry> Entries => _entries;
@@ -67,8 +68,42 @@ namespace MoveShortcuts
             return !System.IO.File.Exists(path) || _entries.ContainsKey(relativePath);
         }
 
+        public bool CanWriteOrHandleConflict(string path, string action = "Skipping")
+        {
+            if (CanWrite(path))
+            {
+                ClearIgnoredConflicts(GetOutputIdentity(path));
+                return true;
+            }
+
+            var identity = GetOutputIdentity(path);
+            var relativePath = GetRelativePath(path);
+            var fingerprint = new ConflictFingerprint(
+                FilePath: relativePath,
+                OptionsPath: relativePath);
+
+            if (IsIgnoredConflict(identity, fingerprint))
+                return false;
+
+            ClearIgnoredConflicts(identity);
+            if (AutoIgnoreConflicts)
+            {
+                IgnoreConflict(identity, fingerprint);
+                Helpers.WriteLine($"Ignoring output conflict for {relativePath}: file exists but is not owned by MoveShortcuts.");
+            }
+            else
+            {
+                Helpers.WriteLine($"{action} {relativePath}: file exists but is not owned by MoveShortcuts.");
+            }
+
+            return false;
+        }
+
         public bool IsOwned(string path)
             => _entries.ContainsKey(GetRelativePath(path));
+
+        public string GetOutputIdentity(string path)
+            => "output:" + GetRelativePath(path).Replace(Path.DirectorySeparatorChar, '/').ToLowerInvariant();
 
         public bool TryFindByIdentity(string identity, out string relativePath, out OwnedOutputEntry entry)
         {

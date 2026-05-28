@@ -65,6 +65,7 @@ if (pathOnlyRequest)
     return;
 
 var autoIgnoreManifestConflicts = IsManifestMergeAutoResolve(args, "ignore");
+outputManifest.AutoIgnoreConflicts = autoIgnoreManifestConflicts;
 
 if (IsStartupCommand(args))
 {
@@ -378,40 +379,28 @@ foreach (var action in Helpers.LogProgress(actionsList, a => a.FileName))
                 if (linTypes.Contains("ps1", StringComparer.OrdinalIgnoreCase))
                 {
                     var altFullPathPs1 = Path.Combine(shortcuts, name) + ".ps1";
-                    if (!Helpers.WouldShadowExternalCommand(shortcuts, altFullPathPs1) && outputManifest.CanWrite(altFullPathPs1))
+                    if (!Helpers.WouldShadowExternalCommand(shortcuts, altFullPathPs1) && outputManifest.CanWriteOrHandleConflict(altFullPathPs1))
                     {
                         Helpers.CreatePowerShellProxy(altFullPathPs1, targetObjectToOpen, elevated, workdir, action.Options.Arguments);
                         outputManifest.Touch(altFullPathPs1, targetObjectToOpen);
-                    }
-                    else if (File.Exists(altFullPathPs1) && !outputManifest.IsOwned(altFullPathPs1))
-                    {
-                        Helpers.WriteLine($"Skipping {Path.GetFileName(altFullPathPs1)}: file exists but is not owned by MoveShortcuts.");
                     }
                 }
                 if (linTypes.Contains("cmd", StringComparer.OrdinalIgnoreCase))
                 {
                     var altFullPathCmd = Path.Combine(shortcuts, name) + ".cmd";
-                    if (!Helpers.WouldShadowExternalCommand(shortcuts, altFullPathCmd) && outputManifest.CanWrite(altFullPathCmd))
+                    if (!Helpers.WouldShadowExternalCommand(shortcuts, altFullPathCmd) && outputManifest.CanWriteOrHandleConflict(altFullPathCmd))
                     {
                         Helpers.CreateCommandPromptProxy(altFullPathCmd, targetObjectToOpen, elevated, workdir, action.Options.Arguments);
                         outputManifest.Touch(altFullPathCmd, targetObjectToOpen);
-                    }
-                    else if (File.Exists(altFullPathCmd) && !outputManifest.IsOwned(altFullPathCmd))
-                    {
-                        Helpers.WriteLine($"Skipping {Path.GetFileName(altFullPathCmd)}: file exists but is not owned by MoveShortcuts.");
                     }
                 }
                 if (linTypes.Contains("sh", StringComparer.OrdinalIgnoreCase))
                 {
                     var altFullPathSh = Path.Combine(shortcuts, name) + ".sh";
-                    if (!Helpers.WouldShadowExternalCommand(shortcuts, altFullPathSh) && outputManifest.CanWrite(altFullPathSh))
+                    if (!Helpers.WouldShadowExternalCommand(shortcuts, altFullPathSh) && outputManifest.CanWriteOrHandleConflict(altFullPathSh))
                     {
                         Helpers.CreateGitBashProxy(altFullPathSh, targetObjectToOpen, elevated, workdir, action.Options.Arguments);
                         outputManifest.Touch(altFullPathSh, targetObjectToOpen);
-                    }
-                    else if (File.Exists(altFullPathSh) && !outputManifest.IsOwned(altFullPathSh))
-                    {
-                        Helpers.WriteLine($"Skipping {Path.GetFileName(altFullPathSh)}: file exists but is not owned by MoveShortcuts.");
                     }
                 }
             }
@@ -567,11 +556,8 @@ static void MakeGroups(string shortcuts, MyFileAction action, string altFullPath
     {
         var copyTo = Path.Combine(shortcuts, grp, Path.GetFileName(altFullPathLnk));
         Directory.CreateDirectory(Path.Combine(shortcuts, grp));
-        if (!outputManifest.CanWrite(copyTo))
-        {
-            Helpers.WriteLine($"Skipping {Path.GetFileName(copyTo)} in group {grp}: file exists but is not owned by MoveShortcuts.");
+        if (!outputManifest.CanWriteOrHandleConflict(copyTo))
             continue;
-        }
         Helpers.Copy(altFullPathLnk, copyTo);
         outputManifest.Touch(copyTo, altFullPathLnk);
     }
@@ -594,6 +580,7 @@ static void BuildProgramStarterFolder(Settings options, List<MyFileAction> actio
     var startupFolder = Path.Combine(options.shortcuts, options.programStarter.folderName);
     Directory.CreateDirectory(startupFolder);
     var startupManifest = OwnedOutputManifest.Load(startupFolder, "program-starter.json", "MoveShortcuts ProgramStarter");
+    startupManifest.AutoIgnoreConflicts = autoIgnoreConflicts;
     startupManifest.File.ShortcutsRoot = options.shortcuts;
 
     foreach (var action in actionsList)

@@ -122,5 +122,32 @@ namespace MoveShortcutTests
 
             Assert.IsFalse(manifest.IsIgnoredConflict("startup:xpto.cmd", fingerprint));
         }
+
+        [TestMethod]
+        public void CanWriteOrHandleConflict_SuppressesExactIgnoredOutputConflict()
+        {
+            var path = Path.Combine(_tempRoot, "manual.cmd");
+            File.WriteAllText(path, "manual");
+            var manifest = OwnedOutputManifest.Load(_tempRoot, "manifest.json", "test");
+            var identity = manifest.GetOutputIdentity(path);
+            var fingerprint = new ConflictFingerprint(FilePath: "manual.cmd", OptionsPath: "manual.cmd");
+            manifest.IgnoreConflict(identity, fingerprint);
+
+            Assert.IsFalse(manifest.CanWriteOrHandleConflict(path));
+            Assert.IsTrue(manifest.IsIgnoredConflict(identity, fingerprint));
+        }
+
+        [TestMethod]
+        public void CanWriteOrHandleConflict_InvalidatesDifferentOutputConflict()
+        {
+            var path = Path.Combine(_tempRoot, "manual.cmd");
+            File.WriteAllText(path, "manual");
+            var manifest = OwnedOutputManifest.Load(_tempRoot, "manifest.json", "test");
+            var identity = manifest.GetOutputIdentity(path);
+            manifest.IgnoreConflict(identity, new ConflictFingerprint(FilePath: "manual.cmd", OptionsPath: "old.cmd"));
+
+            Assert.IsFalse(manifest.CanWriteOrHandleConflict(path));
+            Assert.IsFalse(manifest.File.IgnoredConflicts.ContainsKey(identity));
+        }
     }
 }
