@@ -510,10 +510,10 @@ namespace MoveShortcuts
 
             // Adding actions for UWP apps that are installed
             // GUID taken from https://learn.microsoft.com/en-us/windows/win32/shell/knownfolderid
-            var FODLERID_AppsFolder = new Guid("{1e87508d-89c2-42f0-8a7e-645a0f50ca58}");
+            var FOLDERID_AppsFolder = new Guid("{1e87508d-89c2-42f0-8a7e-645a0f50ca58}");
             try
             {
-                using (ShellObject appsFolder = (ShellObject)KnownFolderHelper.FromKnownFolderId(FODLERID_AppsFolder))
+                using (ShellObject appsFolder = (ShellObject)KnownFolderHelper.FromKnownFolderId(FOLDERID_AppsFolder))
                 {
                     Dictionary<string, string> appNames = new();
                     foreach (var app in (IKnownFolder)appsFolder)

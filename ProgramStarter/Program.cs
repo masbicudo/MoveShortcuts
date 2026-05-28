@@ -161,7 +161,7 @@ static void PrintInfo()
     Console.WriteLine("""
         MoveShortcuts ProgramStarter
 
-        This small runner is managed by MoveShortcuts. Windows starts it at logon
+        This startup runner is managed by MoveShortcuts. Windows starts it at logon
         with --start-now, and it launches timed shortcuts from its own folder.
 
         It is not meant to be configured by opening this executable directly.

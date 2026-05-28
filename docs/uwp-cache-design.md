@@ -39,10 +39,10 @@ Proposed schema:
 ```json
 {
   "schemaVersion": 1,
-  "createdUtc": "2026-05-26T00:00:00Z",
-  "updatedUtc": "2026-05-26T00:00:00Z",
-  "machineName": "NOTE-AVELL-MASB",
-  "userName": "masbi",
+  "createdUtc": "2026-01-01T00:00:00Z",
+  "updatedUtc": "2026-05-10T00:00:00Z",
+  "machineName": "DESKTOP-01",
+  "userName": "alice",
   "userSid": "S-1-5-21-...",
   "packageSignature": {
     "source": "HKCU AppModel Repository Packages",

@@ -207,7 +207,7 @@ foreach (var file in Helpers.LogProgress(allSourceFiles, Path.GetFileName))
 }
 
 // 2.2 - options that represent a full path for a file/folder that actually exists
-// Deprectated: this option is depracated in favor of using fully qualified Target property.
+// Deprecated: this option is deprecated in favor of using fully qualified Target property.
 //              See section 2.3
 foreach (var file in fileOptionsWithoutTarget.Keys.Where(Path.IsPathFullyQualified))
 {
@@ -224,12 +224,12 @@ foreach (var file in fileOptionsWithoutTarget.Keys.Where(Path.IsPathFullyQualifi
 
 // If there is an option not matching files found in the Desktop, Start Menu or UWP Apps,
 // then the option can be a standalone option, meaning that it can represent links or items
-// that must be created dynamicaly. The following sections are for these types of options.
+// that must be created dynamically. The following sections are for these types of options.
 // Note: all of these options have the Target property set to something.
-//       The Target propery indicates what type of items is this.
+//       The Target property indicates what type of item this is.
 //       - URL: when Target starts with http:// or https://
 //       - Path: when Target refers to an absolute Path, i.e. it starts with something like C:/
-//       - Everything: Target refers to items found by using Everythin software, i.e. es filename.exe
+//       - Everything: Target refers to items found by using Everything software, i.e. es filename.exe
 //       - Where: Target refers to items found by using the "where" command, i.e. where filename
 // Note: when using Everything or where command, the first item that is listed is used as the target
 
@@ -306,7 +306,6 @@ foreach (var action in Helpers.LogProgress(actionsList, a => a.FileName))
                 var url = targetObjectToOpen;
                 var web = new HtmlWeb();
                 var doc = web.Load(url);
-                //doc.Save("xpto.html");
                 var head_link_icon = doc.DocumentNode.SelectNodes("//head/link[@rel='icon']");
                 if (head_link_icon != null)
                     foreach (var el in head_link_icon)
@@ -351,9 +350,9 @@ foreach (var action in Helpers.LogProgress(actionsList, a => a.FileName))
                 }
             }
             CreateInternetLink(action.FileName);
-            foreach (var altname in action.Options.AltNames)
+            foreach (var altName in action.Options.AltNames)
             {
-                CreateInternetLink(altname);
+                CreateInternetLink(altName);
             }
         }
     }
@@ -408,13 +407,13 @@ foreach (var action in Helpers.LogProgress(actionsList, a => a.FileName))
                 }
             }
             CreateLocalLink(action.FileName, false);
-            foreach (var altname in action.Options.AltNames)
+            foreach (var altName in action.Options.AltNames)
             {
-                CreateLocalLink(altname, false);
+                CreateLocalLink(altName, false);
             }
-            foreach (var altname in action.Options.ElevNames)
+            foreach (var altName in action.Options.ElevNames)
             {
-                CreateLocalLink(altname, true);
+                CreateLocalLink(altName, true);
             }
         }
     }
@@ -473,9 +472,9 @@ foreach (var action in Helpers.LogProgress(actionsList, a => a.FileName))
             {
                 CreateDirLinks(dirName);
             }
-            foreach (var altname in action.Options.AltNames)
+            foreach (var altName in action.Options.AltNames)
             {
-                CreateDirLinks(altname);
+                CreateDirLinks(altName);
             }
         }
     }
@@ -493,17 +492,17 @@ foreach (var action in Helpers.LogProgress(actionsList, a => a.FileName))
                 action.FullPath = targetFullPath;
             }
 
-            foreach (var altname in action.Options.AltNames)
+            foreach (var altName in action.Options.AltNames)
             {
-                var altFullPath = Path.Combine(shortcuts, altname + ext);
+                var altFullPath = Path.Combine(shortcuts, altName + ext);
                 if (Helpers.CopyShortcutOutput(shortcuts, targetObjectToOpen, altFullPath, outputManifest))
                     MakeGroups(shortcuts, action, altFullPath, outputManifest);
             }
             if (Helpers.HasExt(targetObjectToOpen, ".lnk"))
             {
-                foreach (var altname in action.Options.ElevNames)
+                foreach (var altName in action.Options.ElevNames)
                 {
-                    var altFullPath = Path.Combine(shortcuts, altname + ext);
+                    var altFullPath = Path.Combine(shortcuts, altName + ext);
                     if (Helpers.CopyShortcutOutput(shortcuts, targetObjectToOpen, altFullPath, outputManifest))
                         Helpers.MakeElevatedLink(altFullPath);
                 }
@@ -1426,8 +1425,8 @@ static void RunInit(string optsFileName, string? progressOverride)
         Helpers.WriteLine($"- delayed startup shortcuts can be generated in {Path.Combine(options.shortcuts, options.programStarter.folderName)}");
 
     Helpers.WriteLine("");
-    Helpers.WriteLine($"This will just create the options file at {outputPath}");
-    Helpers.WriteLine("You can revise it before doing anything for real.");
+    Helpers.WriteLine($"This will create the options file at {outputPath}.");
+    Helpers.WriteLine("You can review and edit it before applying any shortcut changes.");
     if (File.Exists(outputPath))
         Helpers.WriteLine("The file already exists and will be overwritten if you proceed.");
 

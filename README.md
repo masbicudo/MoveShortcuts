@@ -2,9 +2,9 @@
 
 Move Shortcuts exists for a simple reason: shortcut clutter gets out of hand fast.
 
-Installers drop icons everywhere — Desktop, Start Menu, hidden folders — and over time things become harder to find than they should be. This tool takes a more intentional approach: gather shortcuts, organize them in one place, and optionally make them easier to launch.
+Installers place icons in many locations — Desktop, Start Menu, hidden folders — and over time shortcuts become harder to find than they should be. This tool takes a more intentional approach: gather shortcuts, organize them in one place, and optionally make them easier to launch.
 
-Think of it as a way to “reset” shortcut chaos into something clean and predictable.
+Think of it as a way to turn scattered shortcuts into something clean and predictable.
 
 ---
 
@@ -24,7 +24,7 @@ Nothing is changed immediately — a config file is written first:
 move-shortcuts-options.json
 ```
 
-You can review it before doing anything else.
+You can review it before applying any shortcut changes.
 
 Once you're happy with the configuration, run:
 
@@ -56,7 +56,7 @@ It can also:
 - Create shorter alias shortcuts based on initials (useful for quick launching)  
 - Generate delayed startup shortcuts through the small ProgramStarter companion  
 
-The goal is not to change how you use Windows — just to reduce friction.
+The goal is not to change how you use Windows, but to reduce friction.
 
 ---
 
@@ -155,7 +155,7 @@ If you're curious about the internal decisions behind how this works, see:
 
 [Design Principles](docs/design-principles.md)
 
-It covers things like:
+It covers topics such as:
 
 - PATH safety rules  
 - Vendor shortcut handling  
@@ -173,13 +173,13 @@ There is also a short performance notebook:
 
 The project has a small `research/` folder documenting the UWP/AppModel
 investigation behind the cache. It is not required to use the tool, but it shows
-the kind of care taken around Windows-specific behavior and performance.
+the care taken around Windows-specific behavior and performance.
 
 ## Closing note
 
-This tool is intentionally small in scope.
+This tool is intentionally focused in scope.
 
-It doesn’t try to replace Windows behavior — it just makes shortcut management feel less messy and more deliberate.
+It does not try to replace Windows behavior. It makes shortcut management more organized and deliberate.
 
 ## License
 
