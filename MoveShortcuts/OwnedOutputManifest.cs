@@ -30,6 +30,7 @@ namespace MoveShortcuts
         public OwnedOutputManifestFile File { get; }
         public bool ManifestExisted { get; }
         public bool AutoIgnoreConflicts { get; set; }
+        public Func<ManifestConflict, ManifestConflictResolution>? ConflictResolver { get; set; }
 
         public IReadOnlyCollection<string> TouchedRelativePaths => _touched;
         public IReadOnlyDictionary<string, OwnedOutputEntry> Entries => _entries;
@@ -86,6 +87,33 @@ namespace MoveShortcuts
                 return false;
 
             ClearIgnoredConflicts(identity);
+            if (ConflictResolver != null)
+            {
+                var resolution = ConflictResolver(new ManifestConflict(
+                    identity,
+                    relativePath,
+                    $"{relativePath}: file exists but is not owned by MoveShortcuts.",
+                    fingerprint,
+                    path));
+                switch (resolution)
+                {
+                    case ManifestConflictResolution.Ignore:
+                        IgnoreConflict(identity, fingerprint);
+                        return false;
+                    case ManifestConflictResolution.IncludeUser:
+                    case ManifestConflictResolution.AcceptFile:
+                        AdoptExisting(path, identity: identity);
+                        return false;
+                    case ManifestConflictResolution.UseOptions:
+                        AdoptExisting(path, identity: identity);
+                        return true;
+                    case ManifestConflictResolution.Skip:
+                    case ManifestConflictResolution.ForgetOwned:
+                    default:
+                        return false;
+                }
+            }
+
             if (AutoIgnoreConflicts)
             {
                 IgnoreConflict(identity, fingerprint);
@@ -153,6 +181,17 @@ namespace MoveShortcuts
         public void ClearIgnoredConflicts(string identity)
         {
             File.IgnoredConflicts.Remove(identity);
+        }
+
+        public bool RemoveByIdentity(string identity)
+        {
+            foreach (var kv in _entries.ToList())
+            {
+                if (kv.Value.Identity != null && kv.Value.Identity.Equals(identity, StringComparison.OrdinalIgnoreCase))
+                    return _entries.Remove(kv.Key);
+            }
+
+            return false;
         }
 
         public bool TryClaimWrite(string path, string? source = null)
@@ -272,4 +311,21 @@ namespace MoveShortcuts
         string? FileDelay = null,
         string? OptionsPath = null,
         string? OptionsDelay = null);
+
+    public sealed record ManifestConflict(
+        string Identity,
+        string DisplayPath,
+        string Message,
+        ConflictFingerprint Fingerprint,
+        string FullPath);
+
+    public enum ManifestConflictResolution
+    {
+        Skip,
+        Ignore,
+        IncludeUser,
+        AcceptFile,
+        UseOptions,
+        ForgetOwned
+    }
 }

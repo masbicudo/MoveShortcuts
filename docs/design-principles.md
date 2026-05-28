@@ -77,6 +77,17 @@ Ignored conflicts are exact-match suppressions, not ownership decisions. If the
 manifest path, current file path, or option target changes for that logical
 identity, the ignore entry is cleared and the conflict is reported again.
 
+Interactive merge is available for one-at-a-time resolution:
+
+```text
+MoveShortcuts manifest merge --interactive
+```
+
+Interactive choices should update the existing three sources of truth
+(manifest, filesystem, or options output) rather than creating a durable fourth
+merge state. The `ignore` choice is the exception by design: it is only a
+self-invalidating UX suppression.
+
 For manifest-owned ProgramStarter files, MoveShortcuts treats delay changes as a
 three-way merge:
 

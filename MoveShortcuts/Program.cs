@@ -65,7 +65,10 @@ if (pathOnlyRequest)
     return;
 
 var autoIgnoreManifestConflicts = IsManifestMergeAutoResolve(args, "ignore");
+var interactiveManifestMerge = IsManifestMergeInteractive(args);
 outputManifest.AutoIgnoreConflicts = autoIgnoreManifestConflicts;
+if (interactiveManifestMerge)
+    outputManifest.ConflictResolver = ResolveOutputConflictInteractively;
 
 if (IsStartupCommand(args))
 {
@@ -73,7 +76,7 @@ if (IsStartupCommand(args))
     return;
 }
 
-if (IsManifestCommand(args) && !autoIgnoreManifestConflicts)
+if (IsManifestCommand(args) && !autoIgnoreManifestConflicts && !interactiveManifestMerge)
 {
     RunManifestCommand(args, options, outputManifest);
     return;
@@ -545,7 +548,7 @@ foreach (var action in Helpers.LogProgress(actionsList, a => a.FileName))
 }
 
 log.Close();
-BuildProgramStarterFolder(options, actionsList, outputManifest, autoIgnoreManifestConflicts);
+BuildProgramStarterFolder(options, actionsList, outputManifest, autoIgnoreManifestConflicts, interactiveManifestMerge);
 outputManifest.RemoveStaleTouchedScope(relativePath =>
     !relativePath.StartsWith(options.programStarter.folderName + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase));
 outputManifest.Save();
@@ -563,7 +566,7 @@ static void MakeGroups(string shortcuts, MyFileAction action, string altFullPath
     }
 }
 
-static void BuildProgramStarterFolder(Settings options, List<MyFileAction> actionsList, OwnedOutputManifest rootManifest, bool autoIgnoreConflicts)
+static void BuildProgramStarterFolder(Settings options, List<MyFileAction> actionsList, OwnedOutputManifest rootManifest, bool autoIgnoreConflicts, bool interactiveMerge)
 {
     if (!options.programStarter.enabled)
     {
@@ -608,6 +611,29 @@ static void BuildProgramStarterFolder(Settings options, List<MyFileAction> actio
             }
 
             startupManifest.ClearIgnoredConflicts(plan.Identity);
+            if (interactiveMerge && plan.Fingerprint != null)
+            {
+                var resolution = ResolveStartupConflictInteractively(action.FileName, startupFolder, startupManifest, plan);
+                if (resolution == ManifestConflictResolution.Ignore)
+                    startupManifest.IgnoreConflict(plan.Identity, plan.Fingerprint);
+                if (resolution == ManifestConflictResolution.AcceptFile)
+                    AcceptStartupFile(startupFolder, startupManifest, plan, window);
+                if (resolution == ManifestConflictResolution.ForgetOwned)
+                    startupManifest.RemoveByIdentity(plan.Identity);
+                if (resolution == ManifestConflictResolution.UseOptions)
+                {
+                    if (!DeleteStartupConflictFiles(startupFolder, plan))
+                        continue;
+                    Helpers.Copy(sourcePath, plan.TargetPath);
+                    var resolvedEntry = startupManifest.Touch(plan.TargetPath, sourcePath, plan.Identity);
+                    resolvedEntry.Delay = delay;
+                    resolvedEntry.Window = window;
+                }
+                if (startupManifest.TryFindByIdentity(plan.Identity, out var resolvedRelativePath, out var resolvedEntryForTouch))
+                    startupManifest.Touch(Path.Combine(startupFolder, resolvedRelativePath), resolvedEntryForTouch.Source, resolvedEntryForTouch.Identity);
+                continue;
+            }
+
             if (autoIgnoreConflicts && plan.Fingerprint != null)
             {
                 startupManifest.IgnoreConflict(plan.Identity, plan.Fingerprint);
@@ -684,6 +710,126 @@ static bool TryFindManagedActionOutput(string shortcuts, string name, OwnedOutpu
 static bool TryGetStartupLogicalIdentity(string path, out string identity)
     => StartupMergePlanner.TryGetStartupLogicalIdentity(path, out identity);
 
+static ManifestConflictResolution ResolveOutputConflictInteractively(ManifestConflict conflict)
+{
+    Helpers.WriteLine("");
+    Helpers.WriteLine("Manifest conflict:");
+    Helpers.WriteLine($"- File: {conflict.DisplayPath}");
+    Helpers.WriteLine("- Manifest: [not present]");
+    Helpers.WriteLine($"- Options: {conflict.Fingerprint.OptionsPath ?? conflict.DisplayPath}");
+    Helpers.WriteLine("");
+    Helpers.WriteLine("[1] skip        Leave unresolved and report again later.");
+    Helpers.WriteLine("[2] ignore      Suppress this exact conflict until it changes.");
+    Helpers.WriteLine("[3] include-user Add this file to the manifest, but do not overwrite it now.");
+    Helpers.WriteLine("[4] use-options Add this file to the manifest and overwrite it with configured output.");
+    return AskResolution(
+        new Dictionary<string, ManifestConflictResolution>
+        {
+            ["1"] = ManifestConflictResolution.Skip,
+            ["2"] = ManifestConflictResolution.Ignore,
+            ["3"] = ManifestConflictResolution.IncludeUser,
+            ["4"] = ManifestConflictResolution.UseOptions,
+            ["s"] = ManifestConflictResolution.Skip,
+            ["i"] = ManifestConflictResolution.Ignore,
+            ["u"] = ManifestConflictResolution.IncludeUser,
+            ["o"] = ManifestConflictResolution.UseOptions,
+        },
+        defaultResolution: ManifestConflictResolution.Skip);
+}
+
+static ManifestConflictResolution ResolveStartupConflictInteractively(
+    string displayName,
+    string startupFolder,
+    OwnedOutputManifest manifest,
+    StartupMergePlan plan)
+{
+    Helpers.WriteLine("");
+    Helpers.WriteLine("ProgramStarter conflict:");
+    Helpers.WriteLine($"- Item: {displayName}");
+    Helpers.WriteLine($"- File: {plan.Fingerprint?.FilePath ?? "[not present]"}");
+    Helpers.WriteLine($"- Manifest: {plan.Fingerprint?.ManifestPath ?? "[not present]"}");
+    Helpers.WriteLine($"- Options: {plan.Fingerprint?.OptionsPath ?? Path.GetFileName(plan.TargetPath)}");
+    Helpers.WriteLine($"- Reason: {plan.Message}");
+    Helpers.WriteLine("");
+    Helpers.WriteLine("[1] skip        Leave unresolved and report again later.");
+    Helpers.WriteLine("[2] ignore      Suppress this exact conflict until it changes.");
+    Helpers.WriteLine("[3] accept-file Make the current file the manifest baseline.");
+    Helpers.WriteLine("[4] use-options Replace conflicting files with configured output.");
+    Helpers.WriteLine("[5] forget-owned Remove manifest ownership and leave files alone.");
+    return AskResolution(
+        new Dictionary<string, ManifestConflictResolution>
+        {
+            ["1"] = ManifestConflictResolution.Skip,
+            ["2"] = ManifestConflictResolution.Ignore,
+            ["3"] = ManifestConflictResolution.AcceptFile,
+            ["4"] = ManifestConflictResolution.UseOptions,
+            ["5"] = ManifestConflictResolution.ForgetOwned,
+            ["s"] = ManifestConflictResolution.Skip,
+            ["i"] = ManifestConflictResolution.Ignore,
+            ["a"] = ManifestConflictResolution.AcceptFile,
+            ["u"] = ManifestConflictResolution.UseOptions,
+            ["f"] = ManifestConflictResolution.ForgetOwned,
+        },
+        defaultResolution: ManifestConflictResolution.Skip);
+}
+
+static ManifestConflictResolution AskResolution(
+    Dictionary<string, ManifestConflictResolution> choices,
+    ManifestConflictResolution defaultResolution)
+{
+    while (true)
+    {
+        Console.Write("Resolution [skip] ");
+        var answer = Console.ReadLine()?.Trim().ToLowerInvariant();
+        if (string.IsNullOrWhiteSpace(answer))
+            return defaultResolution;
+        if (choices.TryGetValue(answer, out var resolution))
+            return resolution;
+        Console.WriteLine("Please choose one of the listed numbers or shortcut letters.");
+    }
+}
+
+static void AcceptStartupFile(string startupFolder, OwnedOutputManifest manifest, StartupMergePlan plan, string window)
+{
+    var filePath = plan.Fingerprint?.FilePath == null ? null : Path.Combine(startupFolder, plan.Fingerprint.FilePath);
+    if (filePath == null || !File.Exists(filePath))
+        return;
+
+    manifest.RemoveByIdentity(plan.Identity);
+    var entry = manifest.AdoptExisting(filePath, identity: plan.Identity);
+    entry.Delay = plan.Fingerprint?.FileDelay;
+    entry.Window = window;
+}
+
+static bool DeleteStartupConflictFiles(string startupFolder, StartupMergePlan plan)
+{
+    foreach (var relativePath in new[] { plan.Fingerprint?.FilePath, plan.Fingerprint?.ManifestPath }
+        .Where(path => !string.IsNullOrWhiteSpace(path))
+        .Distinct(StringComparer.OrdinalIgnoreCase))
+    {
+        var path = Path.Combine(startupFolder, relativePath!);
+        if (path.Equals(plan.TargetPath, StringComparison.OrdinalIgnoreCase))
+            continue;
+        try
+        {
+            if (File.Exists(path))
+                File.Delete(path);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            Helpers.WriteLine($"Could not resolve startup conflict: access denied deleting {relativePath} ({ex.Message})");
+            return false;
+        }
+        catch (IOException ex)
+        {
+            Helpers.WriteLine($"Could not resolve startup conflict: delete failed for {relativePath} ({ex.Message})");
+            return false;
+        }
+    }
+
+    return true;
+}
+
 static string NormalizeStartupDelay(string? delay)
 {
     if (string.IsNullOrWhiteSpace(delay))
@@ -729,7 +875,7 @@ static void RunManifestCommand(string[] args, Settings options, OwnedOutputManif
     var isMergeIncludeUser = IsManifestMergeAutoResolve(args, "include-user");
     if (!isMergeIncludeUser)
     {
-        Console.WriteLine($"Unknown manifest command '{command}'. Use merge --auto-resolve include-user or merge --auto-resolve ignore.");
+        Console.WriteLine($"Unknown manifest command '{command}'. Use merge --auto-resolve include-user, merge --auto-resolve ignore, or merge --interactive.");
         return;
     }
 
@@ -795,6 +941,12 @@ static bool IsManifestMergeAutoResolve(string[] args, string resolution)
        && args[0].Equals("manifest", StringComparison.OrdinalIgnoreCase)
        && args[1].Equals("merge", StringComparison.OrdinalIgnoreCase)
        && HasOptionValue(args, "--auto-resolve", resolution);
+
+static bool IsManifestMergeInteractive(string[] args)
+    => args.Length >= 2
+       && args[0].Equals("manifest", StringComparison.OrdinalIgnoreCase)
+       && args[1].Equals("merge", StringComparison.OrdinalIgnoreCase)
+       && args.Any(arg => arg.Equals("--interactive", StringComparison.OrdinalIgnoreCase));
 
 static bool HasOptionValue(string[] args, string optionName, string expectedValue)
 {
@@ -1448,6 +1600,7 @@ static void PrintHelp()
           MoveShortcuts startup <status|install|uninstall|run>
           MoveShortcuts manifest merge --auto-resolve include-user
           MoveShortcuts manifest merge --auto-resolve ignore
+          MoveShortcuts manifest merge --interactive
 
         Options:
           -h, -help, --help, /?
@@ -1514,6 +1667,10 @@ static void PrintHelp()
           manifest merge --auto-resolve ignore
               Suppress exact current conflicts without changing ownership or
               generated files. The ignore is cleared when that conflict changes.
+
+          manifest merge --interactive
+              Prompt for each manifest conflict and choose skip, ignore,
+              include/accept file, use options, or forget ownership.
 
         ProgramStarter:
           Add "programStarter": { "enabled": true } and per-entry Startup

@@ -77,6 +77,7 @@ MoveShortcuts startup status
 MoveShortcuts startup run
 MoveShortcuts manifest merge --auto-resolve include-user
 MoveShortcuts manifest merge --auto-resolve ignore
+MoveShortcuts manifest merge --interactive
 ```
 
 Progress output adapts by default:
@@ -114,6 +115,11 @@ For conflicts you intentionally want to leave unresolved, `MoveShortcuts
 manifest merge --auto-resolve ignore` suppresses the exact current conflict. If
 the manifest, file name, or option changes, the ignore is invalidated and the
 conflict is reported again.
+
+Use `MoveShortcuts manifest merge --interactive` when you want to decide each
+conflict one at a time. Interactive merge can skip, ignore, include or accept
+the current file, use the configured option, or forget ownership where that
+choice applies.
 
 During `init`, MoveShortcuts can also add your shortcuts folder to PATH if it is
 not already there. User PATH is updated directly; machine PATH uses a one-time
