@@ -251,6 +251,9 @@ namespace MoveShortcuts
         }
 
         public static bool CopyShortcutOutput(string shortcutsRoot, string source, string target)
+            => CopyShortcutOutput(shortcutsRoot, source, target, manifest: null);
+
+        public static bool CopyShortcutOutput(string shortcutsRoot, string source, string target, OwnedOutputManifest? manifest)
         {
             var conflict = GetExternalCommandConflict(shortcutsRoot, target);
             if (conflict != null)
@@ -259,10 +262,22 @@ namespace MoveShortcuts
                 return false;
             }
 
-            return TryWriteShortcutOutput(target, () => Copy(source, target));
+            if (manifest != null && !manifest.CanWrite(target))
+            {
+                WriteLine($"Skipping {Path.GetFileName(target)}: file exists but is not owned by MoveShortcuts.");
+                return false;
+            }
+
+            var written = TryWriteShortcutOutput(target, () => Copy(source, target));
+            if (written)
+                manifest?.Touch(target, source);
+            return written;
         }
 
         public static bool WriteShortcutOutput(string shortcutsRoot, string target, string contents)
+            => WriteShortcutOutput(shortcutsRoot, target, contents, manifest: null);
+
+        public static bool WriteShortcutOutput(string shortcutsRoot, string target, string contents, OwnedOutputManifest? manifest)
         {
             var conflict = GetExternalCommandConflict(shortcutsRoot, target);
             if (conflict != null)
@@ -271,10 +286,22 @@ namespace MoveShortcuts
                 return false;
             }
 
-            return TryWriteShortcutOutput(target, () => File.WriteAllText(target, contents));
+            if (manifest != null && !manifest.CanWrite(target))
+            {
+                WriteLine($"Skipping {Path.GetFileName(target)}: file exists but is not owned by MoveShortcuts.");
+                return false;
+            }
+
+            var written = TryWriteShortcutOutput(target, () => File.WriteAllText(target, contents));
+            if (written)
+                manifest?.Touch(target);
+            return written;
         }
 
         public static bool CreateShortcutOutput(string shortcutsRoot, string linkfile, string target, string icon = null, string workdir = null, string arguments = null)
+            => CreateOwnedShortcutOutput(shortcutsRoot, linkfile, target, icon, workdir, arguments, manifest: null);
+
+        public static bool CreateOwnedShortcutOutput(string shortcutsRoot, string linkfile, string target, string icon = null, string workdir = null, string arguments = null, OwnedOutputManifest? manifest = null)
         {
             var conflict = GetExternalCommandConflict(shortcutsRoot, linkfile);
             if (conflict != null)
@@ -283,7 +310,16 @@ namespace MoveShortcuts
                 return false;
             }
 
-            return CreateShortcut(linkfile, target, icon, workdir, arguments);
+            if (manifest != null && !manifest.CanWrite(linkfile))
+            {
+                WriteLine($"Skipping {Path.GetFileName(linkfile)}: file exists but is not owned by MoveShortcuts.");
+                return false;
+            }
+
+            var created = CreateShortcut(linkfile, target, icon, workdir, arguments);
+            if (created)
+                manifest?.Touch(linkfile, target);
+            return created;
         }
 
         public static bool HasUwpShortcutOptions(Dictionary<string, MyFileOptions> fileOptions)
@@ -506,7 +542,8 @@ namespace MoveShortcuts
         public static void CreateUWPShortcuts(
                 string shortcutsFolder,
                 Dictionary<string, MyFileOptions> fileOptions,
-                Dictionary<string, string> appNames
+                Dictionary<string, string> appNames,
+                OwnedOutputManifest? manifest = null
             )
         {
             var matcher = new FileOptionMatcher(fileOptions, includeFullyQualifiedKeys: false);
@@ -528,10 +565,11 @@ namespace MoveShortcuts
                         Directory.CreateDirectory(shortcutsFolder);
                         shortcutsFolderCreated = true;
                     }
-                    Helpers.CreateShortcutOutput(
+                    Helpers.CreateOwnedShortcutOutput(
                         shortcutsRoot,
                         fullPath,
-                        @$"shell:AppsFolder\{appUserModelID}"
+                        @$"shell:AppsFolder\{appUserModelID}",
+                        manifest: manifest
                         );
                 }
                 it++;

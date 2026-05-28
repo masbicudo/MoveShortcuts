@@ -18,6 +18,8 @@ namespace MoveShortcuts
 
         public PathSettings path = new();
 
+        public ProgramStarterSettings programStarter = new();
+
         public Dictionary<string, MyFileOptions> fileOptions = new();
 
         public static Dictionary<string, MyFileOptions> defaultFileOptions = new()
@@ -112,5 +114,13 @@ namespace MoveShortcuts
         public bool addToMachinePath = false;
         public string userPathPlacement = "auto";
         public string machinePathPlacement = "auto";
+    }
+
+    public class ProgramStarterSettings
+    {
+        public bool enabled = false;
+        public string folderName = "ProgramStarter";
+        public bool installAtLogon = true;
+        public string runnerWindow = "hidden";
     }
 }

@@ -74,6 +74,7 @@ namespace MoveShortcuts
             options.cleanup ??= new CleanupSettings();
             options.aliases ??= new AliasSettings();
             options.path ??= new PathSettings();
+            options.programStarter ??= new ProgramStarterSettings();
             options.fileOptions ??= new Dictionary<string, MyFileOptions>();
         }
     }

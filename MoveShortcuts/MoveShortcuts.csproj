@@ -17,4 +17,20 @@
     <PackageReference Include="WindowsAPICodePack-Shell" Version="1.1.1" NoWarn="NU1701" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\ProgramStarter\ProgramStarter.csproj"
+                      ReferenceOutputAssembly="false"
+                      PrivateAssets="all" />
+  </ItemGroup>
+
+  <Target Name="CopyProgramStarter" AfterTargets="Build">
+    <ItemGroup>
+      <ProgramStarterOutput Include="..\ProgramStarter\bin\$(Configuration)\$(TargetFramework)\ProgramStarter.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(ProgramStarterOutput)"
+          DestinationFolder="$(OutputPath)"
+          SkipUnchangedFiles="true"
+          Condition="'@(ProgramStarterOutput)' != ''" />
+  </Target>
+
 </Project>

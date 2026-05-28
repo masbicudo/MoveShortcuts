@@ -58,6 +58,25 @@ described in RFC 2119.
 - Cache schema changes SHOULD include tests for old, missing, invalid, and stale
   cache files.
 
+## Generated Output Ownership Policy
+
+- MoveShortcuts MUST NOT overwrite or delete files in managed output folders
+  unless they are recorded in the relevant ownership manifest or are being
+  created at a path that does not already exist.
+- Existing files that are not in a manifest MUST be treated as user-owned,
+  even when their names look like files MoveShortcuts could generate.
+- Removing an option from `move-shortcuts-options.json` MAY remove previously
+  generated files, but only when those files are recorded as owned by the
+  manifest for that folder.
+- Manifest files are part of the safety boundary. Schema changes SHOULD keep
+  old, missing, invalid, and stale manifest behavior conservative and tested.
+- Mixed ownership inside `C:\Shortcuts`, group folders, and ProgramStarter
+  folders is expected. User-owned files MUST remain untouched unless the user
+  explicitly gives permission to include them in a manifest.
+- Ignored conflicts are UX suppressions only. They MUST NOT authorize writes,
+  deletes, or ownership changes, and they SHOULD be invalidated when the
+  manifest, filesystem, or options side of the conflict changes.
+
 ## Testing Policy
 
 - Run `dotnet test --no-restore` before committing code changes when practical.
@@ -109,3 +128,9 @@ described in RFC 2119.
   what was measured and why.
 - Promote research into production only after it has a clear correctness story,
   performance value, and tests.
+
+## Planning Policy
+
+- Before proposing larger features or revisiting product/design questions, check `TODO.md` and relevant docs first.
+- If an idea is already captured there, build on it instead of restarting the discussion.
+- Do not treat `TODO.md` as binding implementation instruction; it is a memory aid for future design work.

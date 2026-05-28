@@ -17,6 +17,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\MoveShortcuts\MoveShortcuts.csproj" />
+    <ProjectReference Include="..\ProgramStarter\ProgramStarter.csproj" />
   </ItemGroup>
 
 </Project>

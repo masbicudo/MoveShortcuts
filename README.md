@@ -54,6 +54,7 @@ It can also:
 
 - Clean up processed Desktop shortcuts  
 - Create shorter alias shortcuts based on initials (useful for quick launching)  
+- Generate delayed startup shortcuts through the small ProgramStarter companion  
 
 The goal is not to change how you use Windows — just to reduce friction.
 
@@ -72,6 +73,10 @@ MoveShortcuts --add-user-path
 MoveShortcuts --add-user-path first
 MoveShortcuts --add-machine-path
 MoveShortcuts edit
+MoveShortcuts startup status
+MoveShortcuts startup run
+MoveShortcuts manifest merge --auto-resolve include-user
+MoveShortcuts manifest merge --auto-resolve ignore
 ```
 
 Progress output adapts by default:
@@ -87,6 +92,28 @@ MoveShortcuts --help
 
 `MoveShortcuts edit` opens the active `move-shortcuts-options.json` with your
 default editor, falling back to Notepad if needed.
+
+ProgramStarter is an optional companion runner for delayed logon startup. When
+enabled in config, MoveShortcuts creates one Windows Startup item and writes
+timed shortcuts into:
+
+```bash
+C:\Shortcuts\ProgramStarter
+```
+
+Managed files use readable names such as `01m30s_Discord.lnk`. You can also add
+manual timed files there; MoveShortcuts tracks its own generated files in
+manifests and leaves unowned files alone.
+
+If you want MoveShortcuts to take ownership of files that already exist in a
+managed folder, run `MoveShortcuts manifest merge --auto-resolve include-user`.
+It lists the files first and asks for clearance before adding them to the
+manifests.
+
+For conflicts you intentionally want to leave unresolved, `MoveShortcuts
+manifest merge --auto-resolve ignore` suppresses the exact current conflict. If
+the manifest, file name, or option changes, the ignore is invalidated and the
+conflict is reported again.
 
 During `init`, MoveShortcuts can also add your shortcuts folder to PATH if it is
 not already there. User PATH is updated directly; machine PATH uses a one-time
